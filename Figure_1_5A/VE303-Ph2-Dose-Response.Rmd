@@ -1,0 +1,935 @@
+---
+title: "VE303-Ph2-AnalysisWorkflow to run LME and stats models on VE303 phase2 data"
+author: "Rajita M"
+date: "2024-08-26"
+output: html_document
+---
+
+## Workflow to assess VE303-002 data for 79 patient IA
+## Note packages and source files here
+```{r, warning=FALSE, include=FALSE}
+
+library(plyr)
+library(openxlsx)
+library(RColorBrewer)
+library(tidyverse)
+library(vegan)
+library(here)
+library(ggrepel)
+library(ggpubr)
+library(scales)
+library(Maaslin2)
+library(ZIBR)
+library(nlme)
+library(lme4)
+library(dplyr)
+
+source("colors.R") #source colors
+
+```
+
+## Print R version and working directory.
+```{r}
+#sessionInfo()
+here()
+
+```
+
+## Set up directory structure for output - this will create a new directory with the current date to save results to
+```{r, include=FALSE}
+results <- paste(Sys.Date(), "results dose-response", sep = "_")
+dir.create(here(results), showWarnings = TRUE)
+
+# Function Will be needed for survival analysis ##
+show.me <- function(x){
+  if(as.data.frame(x[, c("rec.diagnosis")])[,1][1] == "Bad"){x$rec.day.in.treatment.surv <- x$rec.day.in.treatment.surv}
+    if(as.data.frame(x[, c("rec.diagnosis")])[,1][1] == "Good"){x$rec.day.in.treatment.surv <- x$Day.in.treatment  }
+
+  return(x)}
+
+```
+
+## Load required files
+```{r, include=FALSE}
+
+
+## Import cleaned metadata Based on merged SPR
+dnameta = read_csv(here("Input files/2022-03-08 VE303_dna_metadata_80IA_mult.csv"))
+
+#### Import updated  marker panel with targeted relative abundance estimation : TO BE COMBINED with metadata file
+ve303 = read_csv(here("Input files/2022-01-11 VE303_Ph2_Extended_Marker_Data.csv"))
+
+## Import cleaned recurrence metadata
+rec = read_csv(here("Input files/2022-03-09 CDI_Recurrences_IA2_treatment_assignment-OUT.csv"))
+
+## Import cleaned conmeds metadata
+conmed = read_csv(here("Input files/2021-10-05 VE303-002_ConMeds_treatment_assignment-OUT.csv"))
+
+
+## Import primary vs secondary CDI population metadata
+study_pops = read_csv(here("Input files/2022-03-16 VE303 prior CDI summary.csv")) %>%
+  rename(Subject.Number = Subject)
+
+```
+
+## Merge Extended marker panel with metadata to create VE303 subject level data file
+## Merge VE303 subject level data and ConMed data to establish time of abx dosing and interaction with recurrence
+## Merge VE303 subject level data and recurrence data 
+
+```{r}
+analysis_78 <- "yes"
+
+## Uses files imported above ##
+source("VE303.data.import.merge.R")
+
+
+conduct_abx <- "Abx"
+ve303.dnameta[is.na(ve303.dnameta$Abx.group_joined_M),]["Abx.group_joined_M"] <- "Missing"
+if(conduct_abx == "Abx"){ve303.dnameta <- ve303.dnameta %>% filter(!Abx.group_joined_M %in% c("Missing"  ) )}
+
+
+```
+
+
+```{r}
+
+ve303.dnameta_preabx <- ve303.dnameta %>% filter(collect.pre.post.abx == "Pre.abx")  
+ve303.dnameta_allabx <- ve303.dnameta 
+
+taxplot <- "Pre Abx"
+
+if(taxplot == "Pre Abx"){
+  #Add frequency variable for all rows - this gives every detection/non-det result a value of 1
+  ve303.dnameta_plot <- data.frame(ve303.dnameta_preabx, freq = 1)
+}
+
+if(taxplot == "All Abx"){
+  #Add frequency variable for all rows - this gives every detection/non-det result a value of 1
+  ve303.dnameta_plot <- data.frame(ve303.dnameta_allabx, freq = 1)
+}
+ 
+
+
+##To plot zeroes
+ve303.dnameta_plot.alt = ve303.dnameta_plot %>%
+  mutate(est_relative_abundance_panel_alt = if_else(detection_status != "Detected", 0, est_relative_abundance_panel)) %>%
+  group_by(Subject.Number, Visit.Name ) %>%
+  mutate(.,est_relative_abundance_panel_alt_sum = sum(est_relative_abundance_panel_alt)) %>%
+  ungroup()
+
+
+
+```
+
+## Plot VE303 detection and calculate summary stats  - All DETECTED events Pre-Abx OR Pre- and Post-Abx  depending on selection in script
+#Add frequency variable for all rows - this gives every detection/non-det result a value of 1
+
+```{r, include=FALSE}
+
+source("VE303.tables.summary.stats.R")
+
+```
+
+### VE303 Abundance - only detected strains
+```{r}
+
+
+##To plot zeroes
+ve303.dnameta.det.alt = ve303.dnameta_plot %>%
+  mutate(est_relative_abundance_panel_alt = if_else(detection_status != "Detected", 0, est_relative_abundance_panel)) %>%
+  group_by(Subject.Number, Visit.Name ) %>%
+  mutate(.,est_relative_abundance_panel_alt_sum = sum(est_relative_abundance_panel_alt)) %>%
+  ungroup()
+
+
+# Filter the data frame to only include VE303 Strain Detected by the marker panel
+ve303.dnameta.det <- ve303.dnameta_plot %>% 
+  filter(detection_status == "Detected")
+
+# Filter the data frame to include VE303 Strain Detected AND Insufficient data by the marker panel
+
+ve303.dnameta.det_ID <- ve303.dnameta_plot %>% 
+  filter(detection_status %in% c("Detected", "Insufficient data"))
+
+
+ve303.dnameta.det.tp <- ve303.dnameta.det %>% 
+  arrange(Subject.Number, Visit.Name.Norm) %>% 
+  group_by(Visit.Name.Norm, organism) %>%      # Select a single representative sample from each Subject for each Visit.Name.Norm & result in the same df as above
+  distinct(Subject.Number, .keep_all = TRUE)
+
+ 
+
+```
+
+# VE303 Abundance summary by Subject and timepoint, dfs for plotting
+```{r,include=FALSE}
+
+source("VE303.abundance.summary.wrangling.R")
+
+
+
+
+```
+
+ 
+
+```{r}
+
+analysis_type <- 'marker_panel'
+
+
+```
+
+ 
+
+```{r}
+
+##############################################################################
+# Prepare full VE303 array for analysis
+##############################################################################
+
+d1 <- ve303.dnameta.det.alt
+
+d1 <- d1 %>%
+  rename(
+    rel_abund = est_relative_abundance_panel_alt
+    )
+
+VE303_sp <- (unique(d1$organism))
+ 
+d11.total <- d1
+days_numeric <- as.numeric(d11.total$Day.in.treatment.norm)
+days_numeric_adjusted <- as.numeric(plyr::mapvalues(d11.total$Day.in.treatment.norm, from= c("Screening","-11"  ,"5" ,"10", "12" , "13" ), to=c(-11,-11 ,7,14 ,14,14)))
+
+batch_factor <- plyr::mapvalues(d11.total$Seq.batch, from= c("Batch 1", "Batch 2", "Batch 3", "Batch 4"), to=c(1, 2, 3, 4))
+response_factor <- plyr::mapvalues(d11.total$rec.diagnosis, from= c("Bad", "Good"), to=c(1, 2))
+response_factor_Wk8 <- plyr::mapvalues(d11.total$rec.diagnosis.Wk8, from= c("Bad", "Good"), to=c(1, 2))
+response_factor_joined <- plyr::mapvalues(d11.total$collect.pre.post.rec_joined, from= c("Post.rec", "Pre.rec"), to=c(1, 2))
+cohort_factor <- plyr::mapvalues(d11.total$TRT.norm, from= c("Placebo","VE303 Low Dose","VE303 High Dose"), to=c(1, 2,3))
+Abx_factor <- as.factor(d11.total$Abx.group_joined_M)
+
+d11.total$Timepoint <- as.numeric(days_numeric)
+d11.total$Timepoint_adj <- as.numeric(days_numeric_adjusted)
+d11.total$Response <- as.numeric(response_factor)
+d11.total$Response_Wk8 <- as.numeric(response_factor_Wk8)
+d11.total$Response_joined <- as.numeric(response_factor_joined)
+d11.total$Treatment <- as.numeric(cohort_factor)
+d11.total$Batch <- as.numeric(batch_factor)
+d11.total$Abx <-  (Abx_factor)
+
+
+
+VE303_sp.all <- d11.total
+ 
+
+# ##############################################################################
+# # Prepare sum VE303 array for ZIBR analysis
+# ##############################################################################
+ 
+d1.total <- ve303.abund.subj.total.time.det.alt
+
+d1.total <- d1.total %>%
+ rename(
+    ve303_tot = est_relative_abundance_panel_alt_sum,
+    ve303_tot_prop = prop_det_alt_sum
+     )
+
+d11.total <- d1.total
+
+days_numeric <- as.numeric(d11.total$Day.in.treatment)
+days_numeric_adjusted <- as.numeric(plyr::mapvalues(d11.total$Day.in.treatment, from= c("Screening","-11"  ,"5" ,"10", "12" , "13" ), to=c(-11,-11 ,7,14 ,14,14)))
+
+
+batch_factor <- plyr::mapvalues(d11.total$Seq.batch, from= c("Batch 1", "Batch 2", "Batch 3", "Batch 4"), to=c(1, 2,3,4))
+response_factor <- plyr::mapvalues(d11.total$rec.diagnosis, from= c("Bad", "Good"), to=c(1, 2))
+response_factor_Wk8 <- plyr::mapvalues(d11.total$rec.diagnosis.Wk8, from= c("Bad", "Good"), to=c(1, 2))
+response_factor_joined <- plyr::mapvalues(d11.total$collect.pre.post.rec_joined, from= c("Post.rec", "Pre.rec"), to=c(1, 2))
+cohort_factor <- plyr::mapvalues(d11.total$TRT.norm, from= c("Placebo","VE303 Low Dose","VE303 High Dose"), to=c(1, 2,3))
+Abx_factor <- as.factor(d11.total$Abx.group_joined_M)
+
+
+d11.total$Timepoint <- (days_numeric)
+d11.total$Timepoint_adj <- (days_numeric_adjusted)
+d11.total$Response <- as.numeric(response_factor)
+d11.total$Response_Wk8 <- as.numeric(response_factor_Wk8)
+d11.total$Response_joined <- as.numeric(response_factor_joined)
+d11.total$Treatment <- as.numeric(cohort_factor)
+d11.total$Batch <- as.numeric(batch_factor)
+d11.total$Abx <-  (Abx_factor)
+
+
+VE303_sp.total <- d11.total
+ 
+
+colpick.total <- c("Sample.ID","Subject.Number","Timepoint_adj","Response","Response_Wk8","Response_joined","Batch" ,"Visit.Name", "Treatment", "ve303_tot", "ve303_tot_prop")
+ 
+colpick.all <- c("Sample.ID","Subject.Number","Timepoint_adj","Response","Response_Wk8","Response_joined","Batch" ,"Visit.Name", "Treatment","rel_abund", "organism")
+
+if(conduct_abx == "Abx"){
+  colpick.total <- c("Sample.ID","Subject.Number","Timepoint_adj","Response","Response_Wk8","Response_joined","Batch" ,"Visit.Name", "Treatment", "Abx", "ve303_tot", "ve303_tot_prop")
+ 
+colpick.all <- c("Sample.ID","Subject.Number","Timepoint_adj","Response","Response_Wk8","Response_joined","Batch" ,"Visit.Name", "Treatment", "Abx" ,"rel_abund", "organism")
+   }
+
+
+```
+ 
+
+# Function to find subjects with required timepoints ##
+```{r}
+
+find.subjects <- function(subs, dtest, tt_choose){
+  subsub <- c() 
+  for (sub1 in subs) {
+  dtt <- dtest %>% filter(Subject.Number == sub1)
+  times <- dtt$Timepoint_adj %>% unique()
+  if(setequal(intersect(tt_choose,times), tt_choose)){
+    subsub <- c(subsub, sub1)} }
+  return(subsub)}
+
+```
+
+
+#### Including desired timepoints ####
+
+### ttest for single timepoint ###
+```{r}
+
+### Identify subjects to include, remove subs where not all timepoints available
+
+#tt_choose <- c(1,7,14, 28)
+daylabel <- "D14"
+tt_choose <- c(14)
+
+dtest <- d11.total
+subjects <- dtest$Subject.Number %>% unique()
+subsub <- find.subjects(subs = subjects, dtest = d11.total, tt_choose = tt_choose)
+print(paste0("Subjects included : " ,subsub %>% length() ))
+
+#############################
+
+d11.total <- VE303_sp.total
+
+VE303_sp1.total <- d11.total[(d11.total$Timepoint_adj %in% tt_choose),][colpick.total]
+VE303_sp1.total <- VE303_sp1.total[ (VE303_sp1.total$Sample.ID != "BK1494623"),][colpick.total]
+VE303_sp1.total <- VE303_sp1.total[(VE303_sp1.total$Subject.Number) %in% subsub,]
+
+#VE303_sp1.total %>% filter(Treatment  == 2 & Response_Wk8 == 1) %>% 
+#  distinct(Subject.Number, .keep_all = TRUE)
+
+ 
+d11.total <- VE303_sp.all
+VE303_sp1.all <- d11.total[(d11.total$Timepoint_adj %in% tt_choose),][colpick.all]
+VE303_sp1.all <- VE303_sp1.all[ (VE303_sp1.all$Sample.ID != "BK1494623"),][colpick.all]
+VE303_sp1.all <- VE303_sp1.all[(VE303_sp1.all$Subject.Number) %in% subsub,]
+
+#VE303_sp1.all %>% filter(Treatment  == 2 & Response_Wk8 == 1) %>% 
+#  distinct(Subject.Number, .keep_all = TRUE)
+data_by_subject <- split(VE303_sp1.total, VE303_sp1.total$Subject.Number)
+
+
+
+
+```
+# Nonparametric unpaired Wilcox test and t-test comparing VE303 abundance and VE303 proportion across treatment groups at Day 14
+```{r, include=FALSE}
+
+####################################################################################################
+
+## As this analysis is for a single timepoint, and there's a duplicate from an unscheduled event in the LD group
+VE303_sp1.total  <- VE303_sp1.total %>% distinct(Subject.Number, .keep_all = TRUE)
+
+VE303_sp1.total_LD <- VE303_sp1.total %>% filter(Treatment == "2") 
+VE303_sp1.total_HD <- VE303_sp1.total %>% filter(Treatment == "3")  
+VE303_sp1.total_PL <- VE303_sp1.total %>% filter(Treatment == "1")  
+
+#FUNCTION
+compare_cohort_ttest <- function(V1, V2, comparison){
+  
+all_p <- c()
+all_stat <- c()
+
+tt_VE303tot_abun <- 
+  t.test(log10(V1$ve303_tot + 0.00001), log10(V2$ve303_tot + 0.00001))
+pv_abun_tot <- tt_VE303tot_abun$p.value
+stat_abun_tot <- tt_VE303tot_abun$statistic
+
+
+tt_VE303tot_prop <- t.test( (V1$ve303_tot_prop ),  (V2$ve303_tot_prop ))
+pv_prop_tot <- tt_VE303tot_prop$p.value
+stat_prop_tot <- tt_VE303tot_prop$statistic
+
+tt_VE303tot_prev  <- t.test(sign(V1$ve303_tot),sign(V2$ve303_tot))
+pv_prev_tot <- tt_VE303tot_prev$p.value
+stat_prev_tot <- tt_VE303tot_prev$statistic
+ttest_df <- data.frame(comparison,pv_abun_tot, stat_abun_tot, pv_prop_tot, 
+                       stat_prop_tot, pv_prev_tot, stat_prev_tot)
+names(ttest_df) <- c("Comparison","p-value Abundance", "t-Statistic Abundance",
+                    "p-value Proportion", "t-Statistic Proportion",
+                    "p-value Prevalence", "t-Statistic Prevalence")
+return(ttest_df)
+}
+
+compare_cohort_wilcox <- function(V1, V2, comparison){
+all_p <- c()
+all_stat <- c()
+tt_VE303tot_abun <- wilcox.test(log10(V1$ve303_tot + 0.00001), 
+                                log10(V2$ve303_tot + 0.00001) , conf.int = TRUE)
+pv_abun_tot <- tt_VE303tot_abun$p.value
+stat_abun_tot <- tt_VE303tot_abun$estimate
+
+
+tt_VE303tot_prop <- wilcox.test( (V1$ve303_tot_prop ),  (V2$ve303_tot_prop ), conf.int = TRUE)
+pv_prop_tot <- tt_VE303tot_prop$p.value
+stat_prop_tot <- tt_VE303tot_prop$estimate
+
+tt_VE303tot_prev  <- wilcox.test(sign(V1$ve303_tot),sign(V2$ve303_tot), conf.int = TRUE)
+pv_prev_tot <- tt_VE303tot_prev$p.value
+stat_prev_tot <- tt_VE303tot_prev$estimate
+
+wilcox_df <- data.frame(comparison,pv_abun_tot, stat_abun_tot, pv_prop_tot, 
+                       stat_prop_tot, pv_prev_tot, stat_prev_tot)
+
+names(wilcox_df) <- c("Comparison","p-value Abundance", "t-Statistic Abundance",
+                    "p-value Proportion", "t-Statistic Proportion",
+                    "p-value Prevalence", "t-Statistic Prevalence")
+return(wilcox_df)
+}
+
+result_LD_HD <- compare_cohort_ttest(VE303_sp1.total_LD, VE303_sp1.total_HD, "LD vs HD")
+result_PL_HD <- compare_cohort_ttest(VE303_sp1.total_PL, VE303_sp1.total_HD, "Placebo vs HD")
+result_PL_LD <- compare_cohort_ttest(VE303_sp1.total_PL, VE303_sp1.total_LD, "Placebo vs LD")
+result_all_t <- rbind(result_LD_HD, result_PL_HD, result_PL_LD)
+
+result_all_t$`p-adjust Abundance` <-  p.adjust( (result_all_t$`p-value Abundance`), method = "BH")
+result_all_t$`p-adjust Proportion` <-  p.adjust( (result_all_t$`p-value Proportion`), method = "BH")
+result_all_t$`p-adjust Prevalence` <-  p.adjust( (result_all_t$`p-value Prevalence`), method = "BH")
+
+
+result_LD_HD <- compare_cohort_wilcox(VE303_sp1.total_LD, VE303_sp1.total_HD, "LD vs HD")
+result_PL_HD <- compare_cohort_wilcox(VE303_sp1.total_PL, VE303_sp1.total_HD, "Placebo vs HD")
+result_PL_LD <- compare_cohort_wilcox(VE303_sp1.total_PL, VE303_sp1.total_LD, "Placebo vs LD")
+
+result_all_wil <- rbind(result_LD_HD, result_PL_HD, result_PL_LD)
+
+result_all_wil$`p-adjust Abundance` <-  p.adjust( (result_all_wil$`p-value Abundance`), method = "BH")
+result_all_wil$`p-adjust Proportion` <-  p.adjust( (result_all_wil$`p-value Proportion`), method = "BH")
+result_all_wil$`p-adjust Prevalence` <-  p.adjust( (result_all_wil$`p-value Prevalence`), method = "BH")
+
+
+ 
+write.xlsx(result_all_wil,  file = here(results, paste(Sys.Date(), taxplot, daylabel,"Total VE303 Wilcox_Abun_Prop_Table S1.xlsx", sep = " ")) )
+
+
+```
+
+
+ 
+
+
+# Functions to loop over VE303 individual species at Day 14 for Wilcoxon unpaired test and ttest
+```{r include=FALSE}
+
+### FUNCTION
+compare_cohorts_species_ttest <- function(V1, V1_tot, V2, V2_tot, specs){
+  tt_VE303tot_abun <- t.test(log10(V1_tot$ve303_tot + 0.00001), log10(V2_tot$ve303_tot + 0.00001)) 
+pv_abun_tot <- tt_VE303tot_abun$p.value
+stat_abun_tot <- tt_VE303tot_abun$statistic
+
+tt_VE303tot_prop <- t.test( (V1_tot$ve303_tot_prop ),  (V2_tot$ve303_tot_prop ))
+pv_prop_tot <- tt_VE303tot_prop$p.value
+stat_prop_tot <- tt_VE303tot_prop$statistic
+
+pv_prev_tot <- NA
+stat_prev_tot <- NA
+
+  for (spec1 in specs) {
+    t_prev <- t.test(V1[V1$organism == spec1, ]$Ndet , V2[V2$organism == spec1, ]$Ndet )
+pv_prev <- c(pv_prev, t_prev$p.value)
+stat_prev <- c(stat_prev, t_prev$statistic)
+
+t_abun <- t.test(log10(0.00001 + V1[V1$organism == spec1, ]$rel_abund) , log10(0.00001 + V2[V2$organism == spec1, ]$rel_abund))
+pv_abun <- c(pv_abun, t_abun$p.value)
+stat_abun <- c(stat_abun, t_abun$statistic)  }
+
+pv_abun <- c(pv_abun, pv_abun_tot, pv_prop_tot)
+stat_abun <- c(stat_abun, stat_abun_tot, stat_prop_tot)
+qv_abun <- p.adjust(pv_abun, method = "BH")
+
+pv_prev <- c(pv_prev, pv_prev_tot)
+qv_prev <- p.adjust(pv_prev, method = "BH")
+v_dum <- NA
+
+stat_prev <- c(stat_prev, stat_prev_tot, v_dum)
+pv_prev <- c(pv_prev,v_dum)
+qv_prev <- c(qv_prev, v_dum)
+
+specs_all <- c(specs, "Total VE303", "Total VE303 Proportion")
+ttest_df <- data.frame(specs_all, pv_abun,qv_abun,stat_abun , pv_prev,qv_prev, stat_prev)
+names(ttest_df) <- c("Species", "p-value Abundance","Adjusted p-value Abundance", "t-Statistic Abundance", "p-value Prevalence", "Adjusted p-value Prevalence", "t-Statistic Prevalence")
+return(ttest_df) }
+
+### FUNCTION
+compare_cohorts_species_wilcoxtest <- function(V1, V1_tot, V2, V2_tot, specs){
+  tt_VE303tot_abun <- wilcox.test(log10(V1_tot$ve303_tot + 0.00001), log10(V2_tot$ve303_tot + 0.00001),conf.int = TRUE) 
+  pv_abun_tot <- tt_VE303tot_abun$p.value
+stat_abun_tot <- tt_VE303tot_abun$estimate
+
+tt_VE303tot_prop <- wilcox.test( (V1_tot$ve303_tot_prop ),  (V2_tot$ve303_tot_prop ), conf.int = TRUE)
+pv_prop_tot <- tt_VE303tot_prop$p.value
+stat_prop_tot <- tt_VE303tot_prop$estimate 
+
+pv_prev_tot <- NA
+stat_prev_tot <- NA
+
+for (spec1 in specs) {
+    t_prev <- wilcox.test(V1[V1$organism == spec1, ]$Ndet , V2[V2$organism == spec1, ]$Ndet , conf.int = TRUE)
+pv_prev <- c(pv_prev, t_prev$p.value)
+stat_prev <- c(stat_prev, t_prev$estimate)
+
+t_abun <- wilcox.test(log10(0.00001 + V1[V1$organism == spec1, ]$rel_abund) , log10(0.00001 + V2[V2$organism == spec1, ]$rel_abund), conf.int = TRUE)
+pv_abun <- c(pv_abun, t_abun$p.value)
+stat_abun <- c(stat_abun, t_abun$estimate)  }
+
+pv_abun <- c(pv_abun, pv_abun_tot, pv_prop_tot)
+stat_abun <- c(stat_abun, stat_abun_tot, stat_prop_tot)
+qv_abun <- p.adjust(pv_abun, method = "BH")
+
+pv_prev <- c(pv_prev, pv_prev_tot)
+qv_prev <- p.adjust(pv_prev, method = "BH")
+v_dum <- NA
+
+stat_prev <- c(stat_prev, stat_prev_tot, v_dum)
+pv_prev <- c(pv_prev,v_dum)
+qv_prev <- c(qv_prev, v_dum)
+
+specs_all <- c(specs, "Total VE303", "Total VE303 Proportion")
+wilcox_df <- data.frame(specs_all, pv_abun,qv_abun,stat_abun , pv_prev,qv_prev, stat_prev)
+names(wilcox_df) <- c("Species", "p-value Abundance","Adjusted p-value Abundance", "t-Statistic Abundance", "p-value Prevalence", "Adjusted p-value Prevalence", "t-Statistic Prevalence")
+return(wilcox_df) }
+
+
+```
+
+ 
+
+### Loop over day 14 log transformed ttest for all strains : HD vs LD ###
+```{r}
+
+VE303_sp1.all_PL <- VE303_sp1.all %>% filter(Treatment == "1") 
+VE303_sp1.all_LD <- VE303_sp1.all %>% filter(Treatment == "2") 
+VE303_sp1.all_HD <- VE303_sp1.all %>% filter(Treatment == "3")
+
+VE303_sp1.all_PL$Ndet  <- sign(VE303_sp1.all_PL$rel_abund)
+VE303_sp1.all_LD$Ndet  <- sign(VE303_sp1.all_LD$rel_abund)
+VE303_sp1.all_HD$Ndet  <- sign(VE303_sp1.all_HD$rel_abund)
+
+
+pv_abun <- c()
+stat_abun <- c()
+
+pv_prev <- c()
+stat_prev <- c()
+
+V1 <- VE303_sp1.all_LD
+V1_tot <- VE303_sp1.total_LD
+V2 <- VE303_sp1.all_HD
+V2_tot <-VE303_sp1.total_HD
+#VE303_sp1.total_PL
+
+specs <- unique(VE303_sp.all$organism)
+test_type <- "ttest"
+
+ttest_all <- compare_cohorts_species_ttest(V1, V1_tot, V2, V2_tot, specs)
+wiltest_all <- compare_cohorts_species_wilcoxtest(V1, V1_tot, V2, V2_tot, specs)
+
+write.xlsx(ttest_all,  file = here(results, paste(Sys.Date(), taxplot, daylabel,"Species TTest_Abun_Prev_Table S1.xlsx", sep = " ")) )
+
+ttest_all
+
+
+```
+  
+
+##Choose which response metadata was given. Assign recurrence_type: Response_Wk8, Response_joined (pre/post), Response OR if model was run without Response metadata i.e recurrence_type = "Response Excluded"
+ 
+### FITTING LME / MAASLIN TO INCLUDE SUBJECTS WITH MISSING SAMPLES
+
+```{r}
+
+##############################################################################
+# Prepare full VE303 array for MAASLIN analysis
+##############################################################################
+
+d1 <- ve303.dnameta.det.alt %>% filter(collect.pre.post.abx == "Pre.abx")
+
+if(conduct_abx == "Abx"){
+ if(taxplot == "Pre Abx"){d1 <- ve303.dnameta.det.alt %>% filter(collect.pre.post.abx == "Pre.abx")}
+ if(taxplot == "All Abx"){d1 <- ve303.dnameta.det.alt  }
+}
+ 
+
+d1 <- d1 %>%
+  rename(
+    rel_abund = est_relative_abundance_panel
+    )
+
+d1.total <- ve303.abund.subj.total.time.det.alt %>% filter(collect.pre.post.abx == "Pre.abx")
+
+if(conduct_abx == "Abx"){
+ if(taxplot == "Pre Abx"){d1.total <- ve303.abund.subj.total.time.det.alt %>% filter(collect.pre.post.abx == "Pre.abx")}
+ if(taxplot == "All Abx"){d1.total <- ve303.abund.subj.total.time.det.alt  }
+}
+
+
+d1.total <- d1.total %>%
+ rename(
+    ve303_tot = est_relative_abundance_panel_alt_sum,
+    ve303_tot_prop = prop_det_alt_sum
+     )
+
+
+VE303_sp <- (unique(d1$organism))
+ 
+d11.total <- d1
+
+days_numeric <- as.numeric(d11.total$Day.in.treatment.norm)
+days_numeric_adjusted <- as.numeric(plyr::mapvalues(d11.total$Day.in.treatment.norm, from= c("Screening","-11"  ,"5" ,"10", "12" , "13" ), to=c(-11,-11 ,7,14 ,14,14)))
+
+  
+#  if (including_NAs == "yes"){
+#    d11.total$Wk.8.Response[is.na(d11.total$Wk.8.Response)] <- "PD"}
+
+batch_factor <- plyr::mapvalues(d11.total$Seq.batch, from= c("Batch 1", "Batch 2", "Batch 3", "Batch 4"), to=c(1, 2 ,3, 4))
+response_factor <- plyr::mapvalues(d11.total$rec.diagnosis, from= c("Bad", "Good"), to=c(1, 2))
+response_factor_Wk8 <- plyr::mapvalues(d11.total$rec.diagnosis.Wk8, from= c("Bad", "Good"), to=c(1, 2))
+cohort_factor <- plyr::mapvalues(d11.total$TRT.norm, from= c("Placebo","VE303 Low Dose","VE303 High Dose"), to=c(1, 2,3))
+response_factor_joined <- plyr::mapvalues(d11.total$collect.pre.post.rec_joined, from= c("Post.rec", "Pre.rec"), to=c(1, 2))
+Abx_factor <-  d11.total$Abx.group_joined_M
+
+
+d11.total$Timepoint <- as.numeric(days_numeric)
+d11.total$Timepoint_adj <- as.numeric(days_numeric_adjusted)
+d11.total$Response <- as.numeric(response_factor)
+d11.total$Response_Wk8 <- as.numeric(response_factor_Wk8)
+d11.total$Response_joined <- as.numeric(response_factor_joined)
+d11.total$Treatment <- as.numeric(cohort_factor)
+d11.total$Batch <- as.numeric(batch_factor)
+d11.total$Abx <- as.factor(Abx_factor)
+
+d11.total$rec.TRT =  paste((d11.total$TRT.norm ),d11.total$rec.diagnosis.Wk8)
+
+d11.total$rec.TRT.combined =  if_else(d11.total$rec.TRT %in% c("VE303 High Dose Good", "VE303 Low Dose Good"), "Dosed Good",
+                                      if_else(d11.total$rec.TRT %in% c("VE303 High Dose Bad", "VE303 Low Dose Bad"), "Dosed Bad",d11.total$rec.TRT))
+
+ 
+
+VE303_sp.all <- d11.total
+
+
+
+# ##############################################################################
+# # Prepare sum VE303 array for Maaslin analysis
+# ##############################################################################
+ 
+d1.total <- ve303.abund.subj.total.time.det.alt  %>% filter(collect.pre.post.abx == "Pre.abx")
+
+d1.total <- d1.total %>%
+ rename(
+    ve303_tot = est_relative_abundance_panel_alt_sum
+     )
+
+d11.total <- d1.total
+
+days_numeric <- as.numeric(d11.total$Day.in.treatment)
+days_numeric_adjusted <- as.numeric(plyr::mapvalues(d11.total$Day.in.treatment, from= c("Screening","-11"  ,"5" ,"10", "12" , "13" ), to=c(-11,-11 ,7,14 ,14,14)))
+
+
+batch_factor <- plyr::mapvalues(d11.total$Seq.batch, from= c("Batch 1", "Batch 2", "Batch 3"), to=c(1, 2, 3))
+response_factor <- plyr::mapvalues(d11.total$rec.diagnosis, from= c("Bad", "Good"), to=c(1, 2))
+response_factor_Wk8 <- plyr::mapvalues(d11.total$rec.diagnosis.Wk8, from= c("Bad", "Good"), to=c(1, 2))
+cohort_factor <- plyr::mapvalues(d11.total$TRT.norm, from= c("Placebo","VE303 Low Dose","VE303 High Dose"), to=c(1, 2,3))
+response_factor_joined <- plyr::mapvalues(d11.total$collect.pre.post.rec_joined, from= c("Post.rec", "Pre.rec"), to=c(1, 2))
+Abx_factor <-  d11.total$Abx.group_joined_M
+
+
+d11.total$Timepoint <- (days_numeric)
+d11.total$Timepoint_adj <- (days_numeric_adjusted)
+d11.total$Response <- as.numeric(response_factor)
+d11.total$Response_Wk8 <- as.numeric(response_factor_Wk8)
+d11.total$Response_joined <- as.numeric(response_factor_joined)
+d11.total$Treatment <- as.numeric(cohort_factor)
+d11.total$Batch <- as.numeric(batch_factor)
+d11.total$Abx <- as.factor(Abx_factor)
+
+d11.total$rec.TRT =  paste(d11.total$TRT.norm,d11.total$rec.diagnosis.Wk8)
+d11.total$rec.TRT.combined =  if_else(d11.total$rec.TRT %in% c("VE303 High Dose Good", "VE303 Low Dose Good"), "Dosed Good",
+                                      if_else(d11.total$rec.TRT %in% c("VE303 High Dose Bad", "VE303 Low Dose Bad"), "Dosed Bad",d11.total$rec.TRT))
+
+
+VE303_sp.total <- d11.total
+
+
+colpick.total <- c("Sample.ID","Subject.Number","Timepoint_adj","Response", "Response_Wk8","Batch" ,"Visit.Name", "Treatment", "ve303_tot", "ve303_tot_prop","collect.pre.post.rec")
+ 
+colpick.all <- c("Sample.ID","Subject.Number","Timepoint_adj","Response","Response_Wk8","Batch" ,"Visit.Name", "Treatment","rel_abund", "organism", "collect.pre.post.rec")
+
+if(conduct_abx == "Abx"){
+  colpick.total <- c("Sample.ID","Subject.Number","Timepoint_adj","Response", "Response_Wk8","Batch" ,"Visit.Name", "Treatment", "Abx.group_joined_M","ve303_tot", "ve303_tot_prop","collect.pre.post.rec")
+ 
+colpick.all <- c("Sample.ID","Subject.Number","Timepoint_adj","Response","Response_Wk8","Batch" ,"Visit.Name", "Treatment",  "Abx.group_joined_M","rel_abund", "organism", "collect.pre.post.rec")
+}
+
+
+```
+
+
+```{r}
+ 
+
+# VE303 Abundance summary by Subject and timepoint, df for plotting INCLUDING zeros
+VE303_sp.all_Maaslin <- VE303_sp.all %>% 
+  select(Sample.ID,Subject.Number, Timepoint_adj ,rec.diagnosis, rec.diagnosis.Wk8, collect.pre.post.rec,Batch, rec.TRT, rec.TRT.combined, Visit.Name,  organism, TRT.norm, rel_abund ) %>%
+  spread(organism, rel_abund, fill=0) %>% # This fills in zeros for all events not detected - needed to calc mean
+  left_join(., distinct(ve303.dnameta[c("Sample.ID","shannon_diversity")]), by = "Sample.ID") 
+
+colpick.all <- c("Subject.Number","Timepoint_adj","rec.diagnosis", "rec.diagnosis.Wk8", "rec.TRT", "rec.TRT.combined","Batch" ,"Visit.Name", "TRT.norm", "collect.pre.post.rec")
+
+if(conduct_abx == "Abx"){
+  VE303_sp.all_Maaslin <- VE303_sp.all %>% 
+  select(Sample.ID,Subject.Number, Timepoint_adj ,rec.diagnosis, rec.diagnosis.Wk8, collect.pre.post.rec,Batch, Abx.group_joined_M, rec.TRT, rec.TRT.combined, Visit.Name,  organism, TRT.norm, rel_abund ) %>%
+  spread(organism, rel_abund, fill=0) %>% # This fills in zeros for all events not detected - needed to calc mean
+  left_join(., distinct(ve303.dnameta[c("Sample.ID","shannon_diversity")]), by = "Sample.ID") 
+ 
+colpick.all <- c("Subject.Number","Timepoint_adj","rec.diagnosis", "rec.diagnosis.Wk8", "rec.TRT", "rec.TRT.combined","Batch",  "Abx.group_joined_M" ,"Visit.Name", "TRT.norm", "collect.pre.post.rec")  
+}
+
+
+VE303_sp.all_Maaslin
+
+```
+
+```{r}
+
+prepMaaslin <- function(VE303_sp.all_Maaslin){
+  
+  ### MODEL 0 ####
+  # ARRAY FOR ALL TREATMENTS,  KEEPING ALL TIMEPOINTS
+  VE303_sp.all_Maaslin_All <- VE303_sp.all_Maaslin 
+  
+  ### MODEL 1 ####
+  # ARRAY FOR ALL TREATMENTS,  KEEPING ALL TIMEPOINTS PRE-RECURRENCE 
+  VE303_sp.all_Maaslin_postrecfiltered <- VE303_sp.all_Maaslin %>% filter(collect.pre.post.rec != "Post.rec")
+
+  ### MODEL 2 ####
+  # ARRAY FOR ALL TREATMENTS, ONLY KEEPING TIMEPOINTS THAT ARE BOTH PRE-RECURRENCE +++ EARLY TIMEPOINTS UP TO DAY 28 ONLY
+  timefilt <- c("Day 1","Day 7","Day 14","Day 28")
+  VE303_sp.all_Maaslin_time_postrecfiltered_D28 <- VE303_sp.all_Maaslin %>% filter((collect.pre.post.rec != "Post.rec") & (Visit.Name %in% timefilt))
+  
+  ### MODEL 3 ####
+  # ARRAY FOR ALL TREATMENTS, ONLY KEEPING TIMEPOINTS THAT ARE BOTH PRE-RECURRENCE +++ EARLY TIMEPOINTS UP TO DAY 14 ONLY
+  timefilt1 <- c( "Day 1","Day 7","Day 14")
+  VE303_sp.all_Maaslin_time_postrecfiltered_D14 <- VE303_sp.all_Maaslin %>% filter((collect.pre.post.rec != "Post.rec") & (Visit.Name %in% timefilt1))
+
+  ### MODEL 4 ####
+  # ARRAY FOR ALL TREATMENTS, ONLY KEEPING EARLY UP TO DAY 28 REGARDLESS OF RECURRENCE STATUS
+  VE303_sp.all_Maaslin_time_filtered <- VE303_sp.all_Maaslin %>% filter((Visit.Name %in% timefilt))
+
+
+  ### MODEL 5 ####
+  # ARRAY FOR ALL TREATMENTS, ONLY KEEPING EARLY UP TO DAY 14 REGARDLESS OF RECURRENCE STATUS
+  VE303_sp.all_Maaslin_time_filtered_D14 <- VE303_sp.all_Maaslin %>% filter((Visit.Name %in% timefilt1))
+  
+  
+  ### MODEL 6 ####
+  # ARRAY FOR ALL TREATMENTS, ONLY KEEPING DAY 14 REGARDLESS OF RECURRENCE STATUS
+  timefilt2 <- c("Day 14")
+  VE303_sp.all_Maaslin_time_filtered_D14_only <- VE303_sp.all_Maaslin %>% filter((Visit.Name %in% timefilt2))
+  
+  ### MODEL 7 ####
+  # ARRAY FOR ALL TREATMENTS, KEEPING DAY 7 and later timepoints + Pre-recurrence  
+  timefilt2 <- c("Day 14")
+  VE303_sp.all_Maaslin_time_postrecfiltered_D1Onward <- VE303_sp.all_Maaslin %>% filter((collect.pre.post.rec != "Post.rec") & (Visit.Name != "Day 1"))
+  
+  models <- c("Model 0","Model 1", "Model 2", "Model 3", "Model 4", "Model 5", "Model 6", "Model 7" )
+  model_description <- c("AllTime","Exclude post-recurrence", "Exclude post-recurrence_D28", "Exclude post-recurrence_D14",
+                         "Exclude post-D28",  "Exclude post-D14",  "Include D14 Only",  "Exclude Day1 and post-recurrence" )
+  Arrays <- list(VE303_sp.all_Maaslin_All,VE303_sp.all_Maaslin_postrecfiltered, VE303_sp.all_Maaslin_time_postrecfiltered_D28, VE303_sp.all_Maaslin_time_postrecfiltered_D14, VE303_sp.all_Maaslin_time_filtered,VE303_sp.all_Maaslin_time_filtered_D14, VE303_sp.all_Maaslin_time_filtered_D14_only, VE303_sp.all_Maaslin_time_postrecfiltered_D1Onward)
+  Output <- list(Arrays, models, model_description)
+  return(Output)
+}
+
+```
+
+# FILTER TIMEPOINTS POST DAY 63 and post abx
+
+```{r}
+
+VE303_sp.all_Maaslin <- VE303_sp.all_Maaslin %>% filter(Timepoint_adj <= 63 & Timepoint_adj > 0)
+ 
+
+```
+
+# CHOOSE WHETHER TO DO TREATMENT COMPARISON FOR ALL LEVELS OR JUST WITH HD LD. 
+```{r}
+# Run LME to compare HD vs placebo and LD vs placebo
+treats <- "Dosed and Placebo"
+
+# Run LME to compare HD vs LD 
+#treats <- "Dosed"
+
+```
+
+```{r, include=FALSE}
+
+if(treats == "Dosed and Placebo"){
+Arr_out <- prepMaaslin(VE303_sp.all_Maaslin)
+Arrays <- Arr_out[[1]]
+models <- Arr_out[[2]]
+model_description <- Arr_out[[3]]
+}
+
+# ARRAY FOR DOSED COMPARISON HD VS LD ONLY, ALL TIMEPOINTS #
+if(treats == "Dosed"){
+VE303_sp.all_Maaslin_filtered <- VE303_sp.all_Maaslin %>% filter(TRT.norm != "Placebo")
+Arr_out <- prepMaaslin(VE303_sp.all_Maaslin_filtered)
+Arrays <- Arr_out[[1]]
+models <- Arr_out[[2]]
+model_description <- Arr_out[[3]]
+}
+
+ 
+
+```
+
+ 
+##CHOOSE Whether Model runs on final recurrence status OR Week 8 Recurrence status
+```{r}
+recurrence_type <- "rec.diagnosis.Wk8"
+## Can take values "treatment","treatment response","interaction treatment response", "response", "prepost response"
+
+#if(conduct_abx != "Abx"){
+#  modelling <- "prepost response"
+#  }
+
+#modelling <- "prepost response"
+modelling <- "treatment Abx"
+
+## When conduct_abx = "Abx", can take value "treatment Abx" 
+#if(conduct_abx == "Abx"){modelling <- "treatment Abx"}
+
+param_choice <- "LOG"
+if(param_choice == "AST"){params <- c("NONE", "AST")}
+if(param_choice == "LOG"){params <- c("NONE","LOG")}
+if(param_choice == "CLR"){params <- c("CLR", "NONE")}
+ 
+modelling
+
+```
+
+
+```{r}
+
+run_maaslin <- "Yes"
+
+print("the models available to run including different data cuts, pre/post recurrence and pre/post antibiotics samples ~")
+model_description
+
+print("The code in the next chunk runs the model using data up to Day 14, and excluding samples collected after a recurrence")
+
+```
+
+
+
+
+
+```{r, include=FALSE}
+
+
+if(run_maaslin == "Yes"){ 
+  countvec <- c(4) # Choose the model that uses data up to Day 14, and excluding samples collected after a recurrence
+#  countvec <- c(1,2,3,4,5,6)
+
+if(modelling == "treatment Abx"){
+    for (cvec in countvec) {  
+    VE303_sp.all_Maaslin_test <- Arrays[[cvec]]
+    model_type <- model_description[cvec]
+  
+    VE303_sp_div <- c(VE303_sp, "shannon_diversity")
+    ve303_organism <- VE303_sp.all_Maaslin_test[VE303_sp]
+    ve303_organism$VE303_total <- rowSums(ve303_organism)
+    pseudo <- 0.00001
+    if(params[2] == "LOG"){ve303_organism == pseudo + ve303_organism}
+
+    ve303_organism$shannon_diversity <- VE303_sp.all_Maaslin_test$shannon_diversity
+    ve303_metadata <- VE303_sp.all_Maaslin_test[colpick.all]
+
+    ve303_organism <- data.frame(ve303_organism)
+    rownames(ve303_organism) <- rownames(ve303_organism)
+
+    ve303_metadata <- data.frame(ve303_metadata)
+    rownames(ve303_metadata) <- rownames(ve303_metadata)
+    
+      if(treats == "Dosed"){fixed <- c("TRT.norm", "Batch", "Abx.group_joined_M")
+                         ref_level <- c(  "Batch,1")} 
+      if(treats == "Dosed and Placebo"){fixed <- c("TRT.norm", "Batch", "Abx.group_joined_M")
+        ref_level <- c(  "TRT.norm,Placebo","Batch,1")} 
+  
+    
+    fit_data2 = Maaslin2(
+    input_data = ve303_organism, 
+    input_metadata = ve303_metadata, 
+
+    normalization =  params[1],
+    transform =  params[2],
+    output = paste(Sys.Date(), treats, taxplot, modelling,  param_choice,model_type,sep = " "), 
+    
+    fixed_effects = fixed,
+    reference =  ref_level,
+    random_effects = c("Subject.Number"))
+      }
+    }
+  }
+
+
+
+```
+ 
+# load model results from Maaslin tsv output and wrangle to view in excel
+```{r}
+
+#treats <- "Dosed"
+treats <- "Dosed and Placebo"
+
+if(conduct_abx == "Abx"){
+  if(taxplot == "Pre Abx"){
+  model_type <- "Exclude post-recurrence_D14"
+  location <- paste(Sys.Date(), treats, taxplot,modelling, "LOG", model_type,sep = " ")
+  location_data <- paste(location ,"all_results.tsv",sep = "/")}
+
+  model_result <- read_tsv(here(location_data))
+  models_list <- list()
+  
+  for (x1 in (model_result$metadata %>% unique())) {
+    model_result1 <- model_result %>% 
+      filter(metadata == x1)
+    
+    model_result2 <- model_result1[
+      with(model_result1, order(value, pval)),] %>%
+      filter(pval < 1.0)
+    models_list <-  append(models_list, list(model_result2)) }
+  
+  models_1 <- lapply(models_list, function(x) cbind(" "=rownames(x), x))
+  ## Writes to multi sheet excel file ###
+  writexl::write_xlsx(models_1, here(location, paste("results", ".xlsx", sep="")) )
+  writexl::write_xlsx(models_1, here(results, paste(treats ,"LME Table S1.xlsx", sep=" ")) )
+}
+ 
+
+```
+   
+ 
+ 
+ 
+
+ 

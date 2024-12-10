@@ -1,0 +1,1137 @@
+---
+title: "VE303-Ph2-Metabolite Analysis Vancomycin_SCFA_BA "
+author: "Rajita Menon"
+date: "2024-08-22"
+output: html_document
+---
+
+## Workflow to model antibiotic concentrations, SCFA and BA
+## Note packages and source files here
+```{r, warning=FALSE, include=FALSE}
+
+library(xgxr)
+library(gridExtra)
+library(grid)
+library(broom)
+library(plyr)
+library(openxlsx)
+library(RColorBrewer)
+library(tidyverse)
+library(vegan)
+library(here)
+library(ggrepel)
+library(ggpubr)
+library(scales)
+library(nlme)
+library(Matrix)
+library(lme4)
+library(lmerTest)
+library(dplyr)
+library(stringi)
+library(patchwork)
+library(rstatix)
+library(Rmisc)
+
+source("colors.R") #source colors
+
+```
+
+## Print R version and working directory.
+```{r, include=FALSE}
+#sessionInfo()
+here()
+
+```
+
+## Set up directory structure for output - this will create a new directory with the current date to save results to
+```{r}
+
+results <- paste(Sys.Date(), "Metabolite Analysis", sep = "_")
+dir.create(here(results), showWarnings = TRUE)
+
+
+
+# Function Will be needed for survival analysis ##
+show.me <- function(x){
+  if(as.data.frame(x[, c("rec.diagnosis")])[,1][1] == "Bad"){x$rec.day.in.treatment.surv <- x$rec.day.in.treatment.surv}
+  if(as.data.frame(x[, c("rec.diagnosis")])[,1][1] == "Good"){x$rec.day.in.treatment.surv <- max(x$Day.in.treatment)}
+  return(x)}
+
+
+abx_analysis <- paste("Abx", "Analysis" ,sep = "_")
+results_abx <- paste(results, abx_analysis, sep = "/")
+dir.create(here(results_abx), showWarnings = TRUE)
+
+metab_analysis <- paste("SCFA_BA", "Analysis" ,sep = "_")
+results_metab <- paste(results, metab_analysis, sep = "/")
+dir.create(here(results_metab), showWarnings = TRUE)
+
+```
+
+## Load required files
+```{r, include=FALSE}
+
+
+## Import cleaned metadata Based on merged SPR
+dnameta = read_csv(here("Input files/2022-03-08 VE303_dna_metadata_80IA_mult.csv"))
+
+#### Import updated  marker panel with targeted relative abundance estimation : TO BE COMBINED with metadata file
+#ve303 = read_csv(here("Input files/2021-10-06 VE303_Ph2_Extended_Marker_Data.csv"))
+ve303 = read_csv(here("Input files/2022-01-11 VE303_Ph2_Extended_Marker_Data.csv"))
+
+## Import cleaned recurrence metadata
+rec = read_csv(here("Input files/2022-03-09 CDI_Recurrences_IA2_treatment_assignment-OUT.csv"))
+
+## Import cleaned conmeds metadata
+conmed = read_csv(here("Input files/2021-10-05 VE303-002_ConMeds_treatment_assignment-OUT.csv"))
+
+## Import primary vs secondary CDI population metadata
+study_pops = read_csv(here("Input files/2022-03-16 VE303 prior CDI summary.csv")) %>%
+  rename(Subject.Number = Subject)
+
+## Import cleaned conmeds metadata
+CFU_dosing= read.xlsx(here("Input files/CFU_Dose_Summary.xlsx"))
+
+## Import vanco, BA, SCFA concentrations data
+vanco.clean.meta = read_csv(here("Input files/2022-04-08 Vanco Results Cleaned IA_1_2_3_4.csv"))
+vanco.clean.meta$Collection.Date1 <- as.Date(vanco.clean.meta$`Collection Date`, format="%m/%d/%Y")
+
+SCFA.clean.meta = read_csv(here("Input files/2022-04-08 SCFA Results Cleaned IA_1_2_3_4.csv"))
+SCFA.clean.meta$Collection.Date <- as.Date(SCFA.clean.meta$`Collection Date`, format="%m/%d/%Y")
+
+BA.clean.meta = read_csv(here("Input files/2022-04-08 BA Results Cleaned IA_1_2_3_4.csv"))
+BA.clean.meta$Collection.Date <- as.Date(BA.clean.meta$`Collection Date`, format="%m/%d/%Y")
+ 
+
+## Import vanco, BA, SCFA concentrations data cleaned and recovered the missing samples
+vanco.clean.meta.updated = read_csv(here("Input files/Vancomycin.csv")) 
+SCFA.clean.meta.updated = read_csv(here("Input files/SCFA.csv"))
+BA.clean.meta.updated = read_csv(here("Input files/BA.csv"))
+ 
+
+```
+
+
+## Merge Extended marker panel with metadata to create VE303 subject level data file
+## Merge VE303 subject level data and ConMed data to establish time of abx dosing and interaction with recurrence
+## Merge VE303 subject level data and recurrence data 
+
+```{r, include=FALSE}
+
+analysis_78 <- "yes"
+
+## Uses files imported above ##
+source("VE303.data.import.merge.R")
+
+dnameta = dnameta %>% mutate(Sample.ID.short = substr(Sample.ID, 1,7))
+ve303.dnameta = ve303.dnameta %>% mutate(Sample.ID.short = substr(MGS.Sample.ID, 1,7))
+ 
+
+```
+
+```{r}
+v1 <- ve303.dnameta %>% distinct(Sample.ID.short, organism, .keep_all = TRUE)
+
+ve303.vanco.meta <- left_join( v1, vanco.clean.meta %>% select(-TRT.norm, -Subject.Number, -Visit.Name, -Begin.Date, -MGS.Sample.ID), by = "Sample.ID.short") %>%  filter(!is.na(Sample.ID.metabolite))
+
+ve303.SCFA.meta <- left_join( v1, SCFA.clean.meta %>% select(-TRT.norm, -Subject.Number, -Visit.Name, -Begin.Date, -MGS.Sample.ID ,-Collection.Date), by = "Sample.ID.short") %>%  filter(!is.na(Sample.ID.metabolite))
+
+ve303.BA.meta <- left_join( v1, BA.clean.meta %>% select(-TRT.norm, -Subject.Number, -Visit.Name, -Begin.Date, -MGS.Sample.ID, -Collection.Date), by = "Sample.ID.short") %>%  filter(!is.na(Sample.ID.metabolite))
+
+SCFA.dnameta <- left_join( SCFA.clean.meta , dnameta %>% select(Subject.Number, rec.diagnosis.Wk8, Abx.group_joined_M, Screening_abx_check,Population) %>% distinct(Subject.Number, .keep_all = TRUE) , by = "Subject.Number")  
+
+BA.dnameta <- left_join( BA.clean.meta , dnameta %>% select(Subject.Number, rec.diagnosis.Wk8, Abx.group_joined_M, Screening_abx_check,Population) %>% distinct(Subject.Number, .keep_all = TRUE) , by = "Subject.Number")  
+
+BA.dnameta <- left_join( BA.dnameta , dnameta %>% 
+                           select(Sample.ID.short,  Day.in.treatment, collect.pre.post.abx) %>% 
+                           distinct(Sample.ID.short, .keep_all = TRUE), by = "Sample.ID.short") %>%
+                    filter(Subject.Number != "100501")
+
+
+SCFA.dnameta <- left_join( SCFA.clean.meta , dnameta %>% select(Subject.Number, rec.diagnosis.Wk8, Abx.group_joined_M, Screening_abx_check,Population) %>% distinct(Subject.Number, .keep_all = TRUE) , by = "Subject.Number")  
+
+SCFA.dnameta <- left_join( SCFA.dnameta , dnameta %>% 
+                           select(Sample.ID.short,  Day.in.treatment, collect.pre.post.abx) %>% 
+                           distinct(Sample.ID.short, .keep_all = TRUE), by = "Sample.ID.short") %>%
+                    filter(Subject.Number != "100501")
+
+
+  
+
+```
+
+
+```{r}
+ 
+SCFA.clean.meta.updated <- SCFA.clean.meta.updated %>% 
+  left_join(dnameta %>% select(Subject.Number, rec.diagnosis.Wk8) %>% distinct(Subject.Number, .keep_all = TRUE), by = "Subject.Number") 
+
+BA.clean.meta.updated <- BA.clean.meta.updated %>% 
+  left_join(dnameta %>% select(Subject.Number, rec.diagnosis.Wk8) %>% distinct(Subject.Number, .keep_all = TRUE), by = "Subject.Number") 
+
+vanco.clean.meta.updated <- vanco.clean.meta.updated %>% 
+  left_join(dnameta %>% select(Subject.Number, rec.diagnosis.Wk8) %>% distinct(Subject.Number, .keep_all = TRUE), by = "Subject.Number") 
+
+   
+ 
+```
+
+  
+
+#Plot heatmaps of on-study metabolites predictive of recurrence BAs - TCDA, TCA, GCA, LCA, UDCA || 
+#Hexanoate, isovalerate, butyrate
+```{r}
+
+
+sig_BA <- c("Taurochenodeoxycholic Acid", "Taurocholic Acid", "Glycocholic Acid", 
+             "Alloiso_Isolithocholic Acid","Lithocholic Acid", 
+             "Ursodeoxycholic Acid")
+
+sig_SBA <- c("Alloiso_Isolithocholic Acid","Lithocholic Acid", 
+             "Ursodeoxycholic Acid")
+
+
+all_SBA <- c("Lithocholic Acid", "Alloiso_Isolithocholic Acid", "Glycolithocholic Acid", 
+             "Dehydrolithocholic Acid", "Taurolithocholic Acid",
+            "Ursodeoxycholic Acid", "Tauroursodeoxycholic Acid" ,"Glycoursodeoxycholic Acid" ,
+            "Isodeoxycholic Acid",  "Glycodeoxycholic Acid", "Taurodeoxycholic Acid")
+
+sig_PBA <- c("Taurochenodeoxycholic Acid", "Taurocholic Acid", "Glycocholic Acid" )
+sig_SCFA <- c("Isovaleric acid", "Hexanoic acid", "Butyric acid"  )
+
+visits_post <- c( "Day 1", "Day 7", "Day 14")
+#visits_post <- c(   "Day 7", "Day 14")
+
+ 
+BA.all <- BA.clean.meta.updated %>% 
+  filter( Visit.Name != "Screening" & TRT.norm != "Placebo") %>%
+  filter(!is.na(concentration_corrected)) %>%
+  mutate(Subject = as.factor(Subject.Number)) %>% 
+  mutate(Analyte_Subject = paste(  Analyte, Subject, sep = "_")) %>%
+  mutate(Metabolite_type = if_else( (Analyte %in% all_SBA), "SBA", "PBA" ) ) %>%
+  mutate(rec.diagnosis.Wk81 = str_replace_all(rec.diagnosis.Wk8, "Bad", "Recurrent")) %>%
+  mutate(rec.diagnosis.Wk81 = str_replace_all(rec.diagnosis.Wk81, "Good", "Non Recurrent"))
+ 
+BA.plot <- BA.clean.meta.updated %>% 
+  filter(Analyte %in% sig_BA & Visit.Name != "Screening" & TRT.norm != "Placebo") %>%
+  filter(!is.na(concentration_corrected)) %>%
+  mutate(Subject = as.factor(Subject.Number)) %>% 
+  mutate(Analyte_Subject = paste(  Analyte, Subject, sep = "_")) %>%
+  mutate(Metabolite_type = if_else( (Analyte %in% sig_SBA), "SBA", "PBA" ) ) %>%
+  mutate(rec.diagnosis.Wk81 = str_replace_all(rec.diagnosis.Wk8, "Bad", "Recurrent")) %>%
+  mutate(rec.diagnosis.Wk81 = str_replace_all(rec.diagnosis.Wk81, "Good", "Non Recurrent"))
+  
+SCFA.plot <- SCFA.clean.meta.updated %>% 
+  filter(Analyte %in% sig_SCFA & Visit.Name != "Screening" & TRT.norm != "Placebo") %>%  
+  filter(!is.na(concentration_corrected)) %>%
+  mutate(Subject = as.factor(Subject.Number)) %>%
+  mutate(Analyte_Subject = paste(  Analyte, Subject, sep = "_")) %>%
+  mutate(Metabolite_type = "SCFA" )  %>%
+  mutate(rec.diagnosis.Wk81 = str_replace_all(rec.diagnosis.Wk8, "Bad", "Recurrent")) %>%
+  mutate(rec.diagnosis.Wk81 = str_replace_all(rec.diagnosis.Wk81, "Good", "Non Recurrent"))
+
+  
+SCFA.all <- SCFA.clean.meta.updated %>% 
+  filter( Visit.Name != "Screening" & TRT.norm != "Placebo") %>%
+  filter(!is.na(concentration_corrected)) %>%
+  mutate(Subject = as.factor(Subject.Number)) %>%
+  mutate(Analyte_Subject = paste(  Analyte, Subject, sep = "_")) %>%
+  mutate(Metabolite_type = "SCFA" )  %>%
+  mutate(rec.diagnosis.Wk81 = str_replace_all(rec.diagnosis.Wk8, "Bad", "Recurrent")) %>%
+  mutate(rec.diagnosis.Wk81 = str_replace_all(rec.diagnosis.Wk81, "Good", "Non Recurrent"))
+
+meta.plot <-  rbind(BA.plot, SCFA.plot)  
+meta.all <-  rbind(BA.all, SCFA.all)  
+  
+calculate_means_metabolite <- function(arr_input, visits){
+meta.plot.heatsummary <- arr_input %>% filter(Visit.Name %in% visits) %>%
+  group_by(Subject, Analyte) %>%
+#  mutate(mean_analyte = log10(mean(concentration_corrected)) ) %>%
+  mutate(mean_analyte = mean(log10(concentration_corrected)) ) %>%
+  ungroup() %>%
+  distinct(Subject, Analyte, .keep_all = TRUE) %>%
+  select(Analyte, Subject, rec.diagnosis.Wk8, rec.diagnosis.Wk81,TRT.norm,mean_analyte, Metabolite_type)
+return(meta.plot.heatsummary)}
+
+BA.plot.heatsummary <- calculate_means_metabolite(BA.plot, visits_post)
+BA.all.heatsummary <- calculate_means_metabolite(BA.all, visits_post)
+SCFA.plot.heatsummary <- calculate_means_metabolite(SCFA.plot, visits_post)
+meta.plot.heatsummary <- calculate_means_metabolite(meta.plot, visits_post)
+meta.all.heatsummary <- calculate_means_metabolite(meta.all, visits_post)
+ 
+
+
+```
+
+## Generate Main text Figure 6A
+#Plot boxplots of mean 2 weeks values for on-study metabolites predictive of recurrence BAs - TCDA, TCA, GCA, LCA, UDCA || 
+#Hexanoate, isovalerate, butyrate
+
+```{r}
+  
+
+mplot <- meta.plot.heatsummary %>% filter(Analyte != "Deoxycholic Acid")
+ggplot(mplot , aes(x=Analyte , y = mean_analyte,fill=rec.diagnosis.Wk8, 
+                    color=rec.diagnosis.Wk8 )) +
+  geom_boxplot(alpha=.6, outlier.size = 0, outlier.shape = NA) +
+  geom_point(pch = 21, size = 2, alpha = 0.2, position = position_jitterdodge()) +
+ facet_grid(cols = vars(mplot$Metabolite_type), 
+              scales = "free", space = "free") +  
+# facet_grid(rows = vars(meta.plot.heatsummary$Metabolite_type), 
+#             cols = vars(meta.plot.heatsummary$rec.diagnosis.Wk8),  scales = "free", space = "free") +  
+
+#  scale_y_log10()+
+  theme_bw() +
+  scale_fill_manual(name = "Diagnosis", values =  rec.cols , 
+                    labels = c("Recurrent", "Non Recurrent")) +
+  scale_color_manual(name = "Diagnosis",values =  rec.cols,
+                     labels = c("Recurrent", "Non Recurrent")) +
+   scale_x_discrete(labels=c("Taurochenodeoxycholic Acid"= "TCDCA", "Taurocholic Acid" = "TCA",
+                            "Glycocholic Acid" ="GCA","Alloiso_Isolithocholic Acid"="Alloiso\nLCA",
+                            "Lithocholic Acid"="LCA","Ursodeoxycholic Acid"="UDCA",
+                            "Isovaleric acid"="Isovaleric\nacid", "Hexanoic acid"="Hexanoic\nacid",
+                            "Butyric acid"="Butyric\nacid")) +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5, vjust = 0.5, size = 14)) +
+  theme(axis.text.y = element_text(size=14), strip.text = element_text(size=14),
+        axis.text.x = element_text(size = 14), axis.title.y = element_text(size=14),
+        legend.title = element_text(size = 13), legend.text = element_text(size = 13)) +
+  labs(x=" ", y="Metabolite Concentration\n(Mean per Subject)")
+
+ggsave(filename = here(results_metab, paste(Sys.Date(), "Metabolites_Recurrence_Figure 6A.png", sep = " ")), 
+       width = 13, height = 4)
+ 
+ 
+
+```
+
+
+## Generate Extended Data Figure 7D
+```{r}
+textsize = 13
+
+################## ALL Metabolites Extended Data Figure 7D #################################################
+
+  
+  ggp <- ggplot(meta.all.heatsummary , 
+                aes(x=Subject , y = Analyte , fill= mean_analyte )) + 
+  theme_classic() +                               # Create heatmap with ggplot2
+  
+    geom_tile(color = "black",
+            lwd = 0.2,
+            linetype = 1) + 
+  scale_fill_gradient2(low = "white" , high = "red" )   +
+ theme(axis.text.x = element_text(size = textsize ,hjust = 1, vjust = 1,  angle = 90), 
+        axis.title.x = element_text(size = textsize  ),
+        plot.title = element_text(size = textsize ),
+        axis.text.y = element_text(size = textsize , hjust = 1, vjust =0.5) ,     
+        axis.title.y = element_text(size = textsize, hjust = 0.5, vjust = 1),
+        strip.text.y = element_text(size = textsize ) ,     
+        strip.text.x = element_text(size = textsize  ) , 
+        #strip.text.y = element_blank(),
+        legend.title = element_text(size = textsize ),
+        panel.background = element_rect(colour = "black", size=0.2, fill=NA)) +
+ #facet_grid(cols =  vars(meta.plot.heatsummary$rec.diagnosis.Wk8),  scales = "free", space = "free" ) +  
+ facet_grid(rows = vars(meta.all.heatsummary$Metabolite_type), 
+             cols = vars(meta.all.heatsummary$rec.diagnosis.Wk81),  scales = "free", space = "free") +  
+  
+    scale_x_discrete(expand = expansion(add = c(0,0))) +
+    scale_y_discrete(expand = expansion(add = c(0,0))) +
+  labs(y="", x="" , fill="Mean Metabolite\nconcentration" )
+
+      #+   coord_fixed() 
+
+  ggsave(filename = here(results_metab, paste(Sys.Date(),                                    
+                                       "Metabolites heatmap EXT Figure7D.png",
+                                      sep = " ")), width = 14, height = 9, dpi = 800)
+ 
+ 
+```
+
+ 
+
+ 
+
+
+
+```{r}
+
+ve303.dnameta_preabx <- ve303.dnameta %>% filter(collect.pre.post.abx == "Pre.abx")  
+ve303.dnameta_allabx <- ve303.dnameta 
+
+taxplot <- "All Abx"
+
+if(taxplot == "Pre Abx"){
+  #Add frequency variable for all rows - this gives every detection/non-det result a value of 1
+  ve303.dnameta_plot <- data.frame(ve303.dnameta_preabx, freq = 1)
+}
+
+if(taxplot == "All Abx"){
+  #Add frequency variable for all rows - this gives every detection/non-det result a value of 1
+  ve303.dnameta_plot <- data.frame(ve303.dnameta_allabx, freq = 1)
+}
+
+
+##To plot zeroes
+ve303.dnameta_plot.alt = ve303.dnameta_plot %>%
+  mutate(est_relative_abundance_panel_alt = if_else(detection_status != "Detected", 0, est_relative_abundance_panel)) %>%
+  group_by(Subject.Number, Visit.Name) %>%
+  mutate(.,est_relative_abundance_panel_alt_sum = sum(est_relative_abundance_panel_alt)) %>%
+  ungroup()
+
+##To plot zeroes
+ve303.dnameta_all.alt = ve303.dnameta_allabx %>%
+  mutate(est_relative_abundance_panel_alt = if_else(detection_status != "Detected", 0, est_relative_abundance_panel)) %>%
+  group_by(Subject.Number, Visit.Name) %>%
+  mutate(.,est_relative_abundance_panel_alt_sum = sum(est_relative_abundance_panel_alt)) %>%
+  ungroup()
+
+ 
+
+```
+ 
+
+```{r}
+
+
+dnameta_subs <- dnameta %>% 
+  select(Subject.Number, TRT.norm, TRT.norm.rec,STRATC, rec.day.in.treatment,
+                                   rec.diagnosis, rec.diagnosis.Wk8, day.in.treat.abx.start, treat.day.len.abx, Abx.group, abx.firsttreat.postdosing) %>%
+  distinct(Subject.Number, .keep_all = TRUE)
+
+
+```
+
+ 
+
+## Plot VE303 detection and calculate summary stats  - All DETECTED events Pre-Abx OR Pre- and Post-Abx  depending on selection in script
+#Add frequency variable for all rows - this gives every detection/non-det result a value of 1
+
+```{r, include=FALSE}
+source("VE303.tables.summary.stats.R")
+```
+
+
+### VE303 Abundance - only detected strains
+```{r}
+
+##To plot zeroes
+ve303.dnameta.det.alt = ve303.dnameta_plot %>%
+  mutate(est_relative_abundance_panel_alt = if_else(detection_status != "Detected", 0, est_relative_abundance_panel)) %>%
+  group_by(Subject.Number, Visit.Name) %>%
+  mutate(.,est_relative_abundance_panel_alt_sum = sum(est_relative_abundance_panel_alt)) %>%
+  ungroup()
+
+
+# Filter the data frame to only include VE303 Strain Detected by the marker panel
+ve303.dnameta.det <- ve303.dnameta_plot %>% 
+  filter(detection_status == "Detected")
+
+# Filter the data frame to include VE303 Strain Detected AND Insufficient data by the marker panel
+
+ve303.dnameta.det_ID <- ve303.dnameta_plot %>% 
+  filter(detection_status %in% c("Detected", "Insufficient data"))
+
+
+ve303.dnameta.det.tp <- ve303.dnameta.det %>% 
+  arrange(Subject.Number, Visit.Name.Norm) %>% 
+  group_by(Visit.Name.Norm, organism) %>%      # Select a single representative sample from each Subject for each Visit.Name.Norm & result in the same df as above
+  distinct(Subject.Number, .keep_all = TRUE)
+
+
+
+```
+
+```{r, include=FALSE}
+
+source("VE303.abundance.summary.wrangling.R")
+
+```
+
+ 
+
+ 
+   
+
+```{r}
+
+abx_diversity <- ve303.dnameta_plot.alt %>% 
+  distinct(Subject.Number, Day.in.treatment.norm, .keep_all = TRUE) %>%
+  filter(!is.na(Abx.group) )
+
+
+abx_indi_diversity <- ve303.dnameta_plot.alt %>% 
+    filter(!is.na(Abx.group) )
+
+days_28 <- c(  "Day 7", "Day 14" , "Day 28" )
+
+abx_strain_exposure <- abx_indi_diversity  %>% 
+  filter(Visit.Name %in% days_28 & Abx.group %in% c("Fidaxomicin", "Vancomycin")) %>%
+  group_by(Subject.Number, organism) %>%
+    mutate(exposure_perstrain = mean(est_relative_abundance_panel_alt)) %>%
+    ungroup() %>%
+    select(TRT.norm, Subject.Number, organism,  Abx.group, exposure_perstrain, treat.day.len.abx)  %>%
+  distinct(Subject.Number, organism, .keep_all = TRUE)
+
+days_14 <- c(  "Day 7", "Day 14" )
+
+abx_strain_exposure_d14 <- abx_indi_diversity  %>% 
+  filter(Visit.Name %in% days_14 & Abx.group %in% c("Fidaxomicin", "Vancomycin")) %>%
+  group_by(Subject.Number, organism) %>%
+    mutate(exposure_perstrain = mean(est_relative_abundance_panel_alt)) %>%
+    ungroup() %>%
+    select(TRT.norm, Subject.Number, organism,  Abx.group, exposure_perstrain, treat.day.len.abx)  %>%
+  distinct(Subject.Number, organism, .keep_all = TRUE)
+
+abx_summary <- abx_diversity %>% distinct(Subject.Number, .keep_all = TRUE) %>% 
+  select(TRT.norm, Subject.Number, rec.diagnosis.Wk8, Abx.group) %>%
+  group_by(TRT.norm, rec.diagnosis.Wk8, Abx.group) %>%
+  mutate(Number_subjects = n_distinct(Subject.Number)) %>%
+  ungroup() %>% distinct(TRT.norm, rec.diagnosis.Wk8, Abx.group , .keep_all = TRUE) %>%
+  arrange(TRT.norm, rec.diagnosis.Wk8, Abx.group)
+
+
+
+abx_diversity %>% distinct(Subject.Number, .keep_all = TRUE) %>% 
+  select(  Subject.Number,  Abx.group) %>%
+  group_by( Abx.group) %>%
+  mutate(Number_subjects = n_distinct(Subject.Number)) %>%
+  ungroup() %>% distinct( Abx.group , .keep_all = TRUE) %>%
+  select(-Subject.Number)
+
+
+vars <- c("species_richness", "shannon_diversity")
+
+abx_diversity <- normDataWithin(data = abx_diversity, idvar = "Subject.Number" , 
+               measurevar =  c( "shannon_diversity"))
+
+abx_diversity <- normDataWithin(data = abx_diversity, idvar = "Subject.Number" , 
+               measurevar =  c( "species_richness"))
+ 
+diversity_change <- abx_indi_diversity %>% 
+  filter(Visit.Name %in% c("Screening", "Day 1") & Abx.group %in% c("Fidaxomicin", "Vancomycin")
+         & Screening_abx_check == "True Screening") %>%
+  select(Subject.Number, Visit.Name, TRT.norm,Abx.group, shannon_diversity ) %>%
+  distinct(Subject.Number, Visit.Name, .keep_all = TRUE) %>%
+  pivot_wider(names_from = Visit.Name, values_from = shannon_diversity) %>%
+  mutate(diff_diversity = Screening - `Day 1`  ) %>%
+  mutate(perc_change_diversity = 100*diff_diversity/ Screening ) %>%
+  filter(!is.na(diff_diversity))
+
+diversity_d1 <- abx_indi_diversity %>% 
+  filter(Visit.Name %in% c( "Day 1") & Abx.group %in% c("Fidaxomicin", "Vancomycin") ) %>%
+  select(Subject.Number, Visit.Name, TRT.norm,Abx.group, shannon_diversity ) %>%
+  distinct(Subject.Number, Visit.Name, .keep_all = TRUE) 
+
+richness_change <- abx_indi_diversity %>% 
+  filter(Visit.Name %in% c("Screening", "Day 1") & Abx.group %in% c("Fidaxomicin", "Vancomycin")
+          & Screening_abx_check == "True Screening") %>%
+  select(Subject.Number, Visit.Name, TRT.norm,Abx.group, species_richness ) %>%
+  distinct(Subject.Number, Visit.Name, .keep_all = TRUE) %>%
+  pivot_wider(names_from = Visit.Name, values_from = species_richness) %>%
+  mutate(diff_richness = Screening - `Day 1`  ) %>%
+  mutate(perc_change_richness = 100*diff_richness/ Screening ) %>%
+  filter(!is.na(diff_richness))
+ 
+```
+
+
+# LME Model to test for total VE303 colonization differences from Day 1 to Day 14 OR Day 56 between Abx types (Vanco or Fidaxo)
+# Table S4B, Table S4C
+
+```{r}
+
+days_long <- c("Day 7" ,  "Day 14" ,  "Day 28", "Day 56"  )
+daylabel_long <- "Till_D56"
+days_short <- c("Day 7" ,  "Day 14"   )
+daylabel_short <- "Till_D14"
+
+#Change label below for relevant analysis up to Day 14 or Day 56
+
+days_stat <- days_short
+daylabel <- daylabel_short
+
+plot_corr <- ve303.dnameta_plot.alt %>% select(MGS.Sample.ID,TRT.norm, Visit.Name, Subject.Number, 
+         est_relative_abundance_panel_alt_sum, shannon_diversity, species_richness, Abx.group) %>%
+  distinct(MGS.Sample.ID, .keep_all = TRUE) %>%
+  filter(Visit.Name %in%  days_stat 
+         & Abx.group %in% c("Vancomycin", "Fidaxomicin")
+         & TRT.norm %in% c("VE303 High Dose", "VE303 Low Dose"))
+
+plot_corr$Visit.Name = factor(plot_corr$Visit.Name, levels = c("Screening", "Day 1"  , "Day 7" , 
+                                                               "Day 14" ,  "Day 28", "Day 56" , 
+                                                               "Day 168"))
+plot_corr$TRT.norm = factor(plot_corr$TRT.norm, levels = c("Placebo", "VE303 Low Dose"  , "VE303 High Dose"))
+
+plot_corr$Abx.group = factor(plot_corr$Abx.group, levels = c("Vancomycin", "Fidaxomicin"  , 
+                                                                       "Metronidazole", "Other"))
+
+plot_corr$log_relabun  <- log10(0.001+100*plot_corr$est_relative_abundance_panel_alt_sum)
+
+
+model <- as.data.frame(summary(lmerTest::lmer( log_relabun  ~    
+                                                   Abx.group + 
+                                                   (1 | Subject.Number), 
+                                               plot_corr, REML = F))$coefficients)
+model$Effect <- rownames(model)
+
+model <- model %>% 
+  rename(p = `Pr(>|t|)` ) 
+
+  
+writexl::write_xlsx(model , here(results_abx,  paste(Sys.Date(),  taxplot, daylabel,"LME Results Abx_Total VE303 Colonization Table S4" , ".xlsx", sep=" ")) )
+ 
+
+
+```
+
+# LME Model to test for individual VE303 colonization differences from Day 1 to Day 14 OR Day 56 between Abx types (Vanco or Fidaxo)
+# Table S4B, Table S4C
+# The p_vals_exposure array will be plotted on Figure 3A of research MS showing mean exposure of each strain up to D14 in vanco vs fidaxo treated subjects.
+
+```{r}
+
+days_long <- c("Day 7" ,  "Day 14" ,  "Day 28", "Day 56"  )
+daylabel_long <- "Till_D56"
+days_short <- c("Day 7" ,  "Day 14"   )
+daylabel_short <- "Till_D14"
+
+
+#Change label below for relevant analysis up to Day 14 or Day 56
+days_stat <- days_short
+daylabel <- daylabel_short
+trtlabel <- "Dosed"
+
+plot_corr <- ve303.dnameta_plot.alt %>% select(MGS.Sample.ID,organism, TRT.norm, Visit.Name, Subject.Number, 
+         est_relative_abundance_panel_alt, shannon_diversity, species_richness, Abx.group) %>%
+  filter(Visit.Name %in%  days_stat 
+         & Abx.group %in% c("Vancomycin", "Fidaxomicin")
+         & TRT.norm %in% c("VE303 High Dose", "VE303 Low Dose"))
+
+plot_corr$Visit.Name = factor(plot_corr$Visit.Name, levels = c("Screening", "Day 1"  , "Day 7" , 
+                                                               "Day 14" ,  "Day 28", "Day 56" , 
+                                                               "Day 168"))
+plot_corr$TRT.norm = factor(plot_corr$TRT.norm, levels = c( "VE303 Low Dose"  , "VE303 High Dose"))
+
+plot_corr$Abx.group = factor(plot_corr$Abx.group, levels = c("Vancomycin", "Fidaxomicin"  ))
+
+plot_corr$log_relabun  <- log10(0.001+100*plot_corr$est_relative_abundance_panel_alt )
+
+
+data <- split(plot_corr, plot_corr$organism )
+
+model_all_list <- lapply(data, function(X){
+  model <- as.data.frame(summary(lmerTest::lmer( log_relabun ~    
+                                                  Abx.group + 
+                                                   (1 | Subject.Number), 
+                                                 X, REML = F))$coefficients)
+
+  model$Effect <- rownames(model)
+  model$Species <- X$organism[1]
+ return(model)} )
+
+model_all <- (do.call(rbind, model_all_list)) %>% 
+  rename(p = `Pr(>|t|)` ) 
+
+model_all <- model_all %>%  filter(!grepl("Intercept", Effect))
+
+model_save <- split(model_all, model_all$Effect)
+model_save1 <- lapply(model_save, function(X){
+  X <- X %>% arrange(p) 
+  X$p_adjusted <- p.adjust(X$p, method = "BH")
+  return(X)})
+
+ 
+writexl::write_xlsx(model_save1, here(results_abx,  paste(Sys.Date(),  taxplot,daylabel, trtlabel, "LME Results Abx Individual VE303 colonization Table S4" , ".xlsx", sep=" ")) )
+
+
+if (daylabel == "Till_D14"){
+  print("saving short term analysis p-values array for Figure 3A")
+  p_vals_exposure <- model_save1$Abx.groupFidaxomicin %>% select(Species, p_adjusted) %>% rename(organism = Species)}
+
+```
+
+
+## Vanco voncentration over time in dosed cohorts
+# Figure 3C
+```{r} 
+
+vanco.dnameta <- vanco.clean.meta.updated
+
+vanco.dnameta$Visit.Name = factor(vanco.dnameta$Visit.Name, levels = c("Screening", "Day 1"  , "Day 7" , "Day 14" ,  "Day 28", "Day 56" , "Day 168"))
+vanco.dnameta$TRT.norm = factor(vanco.dnameta$TRT.norm, levels = c("Placebo", "VE303 Low Dose"  , "VE303 High Dose"))
+
+days_pre <- c("Screening", "Day 1"  , "Day 7", "Day 14"  )
+
+vanco.plot <- vanco.dnameta %>% 
+  filter(! is.na(Visit.Name) ) %>%
+  filter(Abx.group %in% c("Vancomycin", "Other") ) %>%
+  filter( !(Visit.Name == "Screening" & Screening_abx_check == "On-Abx Screening") )
+
+ 
+
+###################################################################
+
+vanco_dy_dosed <- ggplot(vanco.plot %>% filter(Visit.Name %in% days_pre & TRT.norm != "Placebo") , 
+       aes(x=Visit.Name , y=  concentration_corrected,fill=TRT.norm, color=TRT.norm )) +
+  #geom_boxplot(alpha=.6, outlier.size = 0, outlier.shape = NA) +
+  geom_point(pch = 21, size = 2, alpha = 0.2, position = position_jitterdodge()) +
+  geom_line(aes(group = Subject.Number ),alpha=.3 ) +
+  #geom_hline(yintercept = 0.1, linetype="longdash", color="red") +
+  facet_grid(~TRT.norm, scales="free_x", space = "free") + 
+  stat_summary(aes(group=TRT.norm), fun = "median", geom = "line", 
+               alpha = 0.6 , size = 1.8,position = position_dodge(width = .75))+
+  scale_y_log10()+
+  theme_bw() +
+  scale_fill_manual(values = coh.cols) +
+  scale_color_manual(values = coh.cols) +
+  theme(axis.text.x = element_text(angle = 40, hjust = 1, vjust = 1, size = 14)) +
+  theme(axis.text.y = element_text(size=14), strip.text = element_text(size=14),
+        axis.text.x = element_text(size = 14), strip.text.x = element_text(size=14),
+        strip.text.y = element_text(size=14)) +
+  #ylim(0, 250)+
+  labs(x="",  y= ( "Vanco Concentration [ug/g stool]"), fill = "Treatment", color = "Treatment" )
+
+ggsave(filename = here(results_abx, paste(Sys.Date(), taxplot,"Vancomycin in Dosed Cohorts Over Time_Figure 3C.pdf", sep = " ")), 
+       width = 10, height = 5)
+
+
+ 
+
+```
+ 
+
+# Joining VE303 detection and abundance with vancomycin concentrations file.
+
+```{r}
+ 
+# Compute mean VE303 abundance per strain during week 1-2 from all available mgs data
+
+# Vanco array does not have Day 7 and Day 14 samples for all subjects, but we want to calculate 
+# colonization over this period
+day_max = 10
+day_min = 1
+day_interval = paste0( "Day ",as.character(day_min), " to ", as.character(day_max))
+day_interval
+
+ve303.all_AvCol <- ve303.dnameta_plot.alt %>% 
+  filter(Day.in.treatment  < day_max & Day.in.treatment  > day_min) %>%
+  group_by(Subject.Number, organism) %>% 
+  mutate(mean_early_colonization = mean(est_relative_abundance_panel_alt))%>%
+  ungroup() %>% 
+  distinct(Subject.Number, organism, .keep_all = TRUE) %>%
+  select(Subject.Number, organism, mean_early_colonization)  
+
+# Compute mean VE303 total abundance during week 1-2 from all available mgs data
+ve303.total_AvCol <- ve303.dnameta_plot.alt %>% 
+  filter(Day.in.treatment  < day_max & Day.in.treatment  > day_min) %>%
+  distinct(Subject.Number, Day.in.treatment, .keep_all = TRUE) %>%
+  group_by(Subject.Number) %>% 
+  mutate(mean_total_early_colonization = mean(est_relative_abundance_panel_alt_sum))%>%
+  ungroup() %>% 
+  distinct(Subject.Number, .keep_all = TRUE) %>%
+  select(Subject.Number,  mean_total_early_colonization)  
+
+# Compute mean VE303 total detection during week 1-2 from all available mgs data
+ve303.total_AvDetection <- ve303.colonize.sum.alt %>% 
+  filter(Day.in.treatment  < day_max & Day.in.treatment  > day_min) %>%
+  distinct(Subject.Number, Day.in.treatment, .keep_all = TRUE) %>%
+  group_by(Subject.Number) %>% 
+  mutate(mean_total_early_detection = mean(N_det_alt_sum))%>%
+  ungroup() %>% 
+  distinct(Subject.Number, .keep_all = TRUE) %>%
+  select(Subject.Number,  mean_total_early_detection)  
+
+ 
+
+v1 <- ve303.dnameta_plot.alt %>% 
+  distinct(MGS.Sample.ID, organism, .keep_all = TRUE) %>%
+  left_join(vanco.clean.meta.updated  %>% filter(!is.na(concentration_corrected)) %>%   ## remove QNS samples that failed analysis
+            select(Analyte, concentration_corrected, Subject.Number, Collection.Date  ), by = c("Subject.Number", "Collection.Date")) %>%
+  filter(!is.na(Analyte))
+  
+v2 <- ve303.colonize.sum.alt %>% 
+  distinct(Sample.ID.short, .keep_all = TRUE) %>%
+  select(Sample.ID.short, N_det_alt_sum)
+
+
+ve303.vanco.meta.all <- left_join( v1, v2, by = "Sample.ID.short")   %>%
+  select( Sample.ID.short,MGS.Sample.ID ,Subject.Number, Visit.Name.Norm, 
+          Day.in.treatment ,TRT.norm,rec.diagnosis.Wk8 , treat.day.len.abx , organism,
+         detection_status, est_relative_abundance_panel_alt, Abx.group,
+         est_relative_abundance_panel_alt_sum,N_det_alt_sum ,concentration_corrected) %>%
+  left_join(ve303.all_AvCol, by = c("Subject.Number", "organism")) %>%
+  arrange(Subject.Number, Day.in.treatment)
+ 
+ve303.vanco.meta.total <-   ve303.vanco.meta.all %>%   
+  distinct(Sample.ID.short, .keep_all = TRUE) %>%
+  select(MGS.Sample.ID ,Subject.Number, Visit.Name.Norm, Day.in.treatment ,
+         TRT.norm,rec.diagnosis.Wk8 , treat.day.len.abx , Abx.group, 
+         est_relative_abundance_panel_alt_sum, N_det_alt_sum, concentration_corrected) %>%
+  left_join(ve303.total_AvCol, by = c("Subject.Number" )) %>%
+  left_join(ve303.total_AvDetection, by = c("Subject.Number" ))  
+  
+ 
+```
+ 
+#Plot correlation between Vancomycin concentrations and VE303 strain abundance at days 7, 14.
+#All timepoints are included here
+# Figure 3D
+# Table S4D
+```{r}
+
+#################### LME MODEL FOR VE303 Abundance vs Vanco up to Day 56
+
+plot_corr <- ve303.vanco.meta.all %>% 
+  filter(Abx.group %in% c("Vancomycin", "Other") ) %>%
+  filter(TRT.norm != "Placebo" & Day.in.treatment  < 63 & Day.in.treatment > 4 ) %>%
+  filter(!is.na(concentration_corrected))
+ 
+days_stat <- "Day7_to_Day56"
+
+plot_corr$log_concentration_corrected <- log10(plot_corr$concentration_corrected)
+plot_corr$log_relabun  <- log10(0.001+100*plot_corr$est_relative_abundance_panel_alt)
+
+data <- split(plot_corr, plot_corr$organism )
+
+
+model_all_list <- lapply(data, function(X){
+  model <- as.data.frame(summary(lmerTest::lmer( log_relabun ~    
+                                                  log_concentration_corrected + TRT.norm + 
+                                                  (1 | Subject.Number), X, REML = F))$coefficients)
+
+  model$Effect <- rownames(model)
+  model$Species <- X$organism[1]
+ return(model)} )
+
+model_all <- (do.call(rbind, model_all_list)) %>% 
+  rename(p = `Pr(>|t|)` ) 
+
+model_all <- model_all %>%  filter(!grepl("Intercept", Effect))
+
+model_save <- split(model_all, model_all$Effect)
+model_save1 <- lapply(model_save, function(X){
+  X <- X %>% arrange(p) 
+  X$p_adjusted <- p.adjust(X$p, method = "BH")
+  return(X)})
+
+ 
+writexl::write_xlsx(model_save1, here(results_abx,  paste(Sys.Date(),  taxplot, days_stat, "LME Results VE303 vs Vanco" , ".xlsx", sep=" ")) )
+
+#################### LME MODEL FOR VE303 Abundance vs Vanco up to Day 14, results reported in Table S4D ########
+
+plot_corr <- ve303.vanco.meta.all %>% 
+  filter(Abx.group %in% c("Vancomycin", "Other") ) %>%
+  filter(TRT.norm != "Placebo" & Day.in.treatment  < 16 & Day.in.treatment > 4 ) %>%
+  filter(!is.na(concentration_corrected))
+ 
+days_stat <- "Day7_to_Day14"
+
+plot_corr$log_concentration_corrected <- log10(plot_corr$concentration_corrected)
+plot_corr$log_relabun  <- log10(0.001+100*plot_corr$est_relative_abundance_panel_alt)
+
+data <- split(plot_corr, plot_corr$organism )
+
+
+model_all_list <- lapply(data, function(X){
+  model <- as.data.frame(summary(lmerTest::lmer( log_relabun ~    
+                                                  log_concentration_corrected + TRT.norm + 
+                                                  (1 | Subject.Number), X, REML = F))$coefficients)
+
+  model$Effect <- rownames(model)
+  model$Species <- X$organism[1]
+ return(model)} )
+
+model_all <- (do.call(rbind, model_all_list)) %>% 
+  rename(p = `Pr(>|t|)` ) 
+
+model_all <- model_all %>%  filter(!grepl("Intercept", Effect))
+
+model_save <- split(model_all, model_all$Effect)
+model_save1 <- lapply(model_save, function(X){
+  X <- X %>% arrange(p) 
+  X$p_adjusted <- p.adjust(X$p, method = "BH")
+  return(X)})
+
+ 
+writexl::write_xlsx(model_save1, here(results_abx,  paste(Sys.Date(),  taxplot, days_stat, "LME Results VE303 vs Vanco Table S4D" , ".xlsx", sep=" ")) )
+
+
+
+#########
+
+plot_corr$log_relabun  <- log10(0.01+100*plot_corr$est_relative_abundance_panel_alt)
+plot_corr$log_concentration_corrected <- log10(plot_corr$concentration_corrected)
+
+plot_corr_earlymean <- plot_corr %>% group_by(Subject.Number, organism) %>%
+  mutate(logmean_persub = mean(log_relabun)) %>%
+  mutate(logmeanvanco_persub = mean(log_concentration_corrected)) %>%
+  ungroup() %>%
+  distinct(Subject.Number, organism, .keep_all = TRUE) %>%
+  select(organism, logmean_persub, logmeanvanco_persub )
+
+
+plot_corr_earlymean <- plot_corr_earlymean %>%
+  group_by(organism) %>%
+  mutate(spearman_cor = cor(logmean_persub, logmeanvanco_persub, method = "spearman")) %>%
+  ungroup() %>%
+  mutate(Cor_labels = paste0("Spearman R = \n", signif(spearman_cor,2)) )  
+
+
+########## correlation between mean Vancomycin concentrations and mean VE303 strain abundance over days 7, 14 #########
+########## Figure 3D #################
+
+
+days_stat <- "Day7_to_Day14 meanpersub"
+
+ve303_corrvanc <- ggplot(plot_corr_earlymean %>% filter(organism != "VE303-06"), 
+                         aes(y =  logmean_persub, x= logmeanvanco_persub )) + 
+  geom_point( pch = 21 ,size = 3, color = "midnightblue" , fill = "midnightblue",alpha = 0.7 ) +
+  geom_text(aes(y = 0.25, x = 3.435, label = Cor_labels) , 
+            size = 3.5 , color = "darkslategray" ) +
+  facet_wrap(~organism, scales = "fixed" ) + 
+  theme_classic() +
+  #scale_y_log10()+
+  #scale_x_log10()+
+ geom_smooth(method = "lm",
+              formula = y ~ x) +
+
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5, vjust = 0.5, size = 10)) +
+  theme(axis.text.y = element_text(size=10), strip.text = element_text(size=10) ) +
+
+  labs(x="Log Mean Vanco per Subject [ug/g stool]\n(2 weeks)", y="Log Mean Abundance per Subject \n(2 weeks)")
+  ggsave(filename = here(results_abx, paste(Sys.Date(), taxplot, days_stat,"Vanco vs Individual VE303 Abundance Correlation_Figure 3D.pdf", sep = " ")),  width = 9.5, height = 6.5)
+
+ve303_corrvanc
+
+
+```
+
+
+ 
+
+
+```{r}
+
+p_vals_exposure <- p_vals_exposure %>% arrange(organism) %>% mutate(x_label = c(1,2,3,4,5,6,7,8), y_label = 10)
+ 
+
+abx_strain_exposure_plot <- abx_strain_exposure %>% left_join(p_vals_exposure, by = "organism") %>%
+  mutate(p_labels = paste0("p = ", signif(p_adjusted,2)) )  
+
+abx_strain_exposure_plot14 <- abx_strain_exposure_d14 %>% left_join(p_vals_exposure, by = "organism") %>%
+  mutate(p_labels = paste0("p = ", signif(p_adjusted,2)) )  
+
+
+```
+
+```{r}
+
+abx.cols2 <- c("Vancomycin" =  "turquoise4", "Fidaxomicin" = "tan4" )
+
+###############
+
+av_ex_dosed_14 <- ggplot(abx_strain_exposure_plot14 %>% filter(TRT.norm != "Placebo" ), 
+       aes(x=organism , y= 0.01+(100*exposure_perstrain),
+           fill=Abx.group, color=Abx.group)) +
+  geom_boxplot(width = 0.5,alpha=.7, outlier.size = 0, outlier.shape = NA) +
+  geom_point(pch = 21, size = 2, alpha = 0.2, position = position_jitterdodge()) +
+ geom_text(aes(x = x_label, y = y_label, label = p_labels) , 
+            size = 3.5 , color = "darkslategray" ) +
+  #geom_hline(yintercept = 0.1, linetype="longdash", color="red") +
+  #facet_grid(TRT.norm~., scales="free_x", space = "free") + 
+  scale_y_log10()+
+  theme_bw() +
+  scale_fill_manual(values =  abx.cols2) +
+  scale_color_manual(values =  abx.cols2) +
+  theme(axis.text.x = element_text(angle = 40, hjust = 1, vjust = 1, size = 14)) +
+  theme(axis.text.y = element_text(size=14), strip.text = element_text(size=14),
+        axis.text.x = element_text(size = 14), strip.text.x = element_text(size=14),
+        strip.text.y = element_text(size=14)) + theme_classic() +
+  theme(strip.text.y = element_text(size = 12), axis.text.x = element_text(angle = 0,size = 11.5, hjust = 0.5, vjust = 0.5), panel.spacing = unit(1.4, "lines")) +
+  labs(x = "",  y="Log Mean Exposure per Subject \n(2 weeks)", color="Antibiotic", fill="Antibiotic")
+
+ggsave(filename = here(results_abx, paste(Sys.Date(), taxplot,"VE303_Strains_AV EXPOSURE_Fidaxo_Vanco Dosed 2 WEEKS_Figure 3A.pdf", sep = " ")), 
+       width = 10, height = 4)
+
+
+###############
+ 
+
+ 
+my_comparisons <- list( c("Vancomycin", "Fidaxomicin"))
+ss <- 3.5
+syms <- list(cutpoints = c(0, 0.0001, 0.001, 0.01, 0.05, 0.1, 1), symbols = c("****", "***", "**", "*", "p < 0.1" ,"ns"))
+
+
+diversity_change$combined <- "Dosed"
+
+delta_div_dosed <- ggplot(diversity_change %>% filter(TRT.norm != "Placebo" ), 
+       aes(x=combined , y= perc_change_diversity,
+           fill=Abx.group, color=Abx.group)) +
+  geom_boxplot(width = 0.2,alpha=.7, outlier.size = 0, outlier.shape = NA, 
+               position = position_dodge(0.75) ) +
+  geom_point(pch = 21, size = 2, alpha = 0.2, position = position_jitterdodge(0.2)) +
+  geom_segment(aes(x=0,xend=1.5,y=0,yend=0), linetype="longdash", color="red") +
+ # stat_compare_means(aes(group = Abx.group), comparisons = my_comparisons, 
+#                      method = "wilcox.test", label = "p.signif", 
+ #                                          symnum.args = syms) +  
+
+  geom_text(aes(x = 1.03, y = 93, label =  ("p = 0.005")) , 
+            size = ss , color = "darkslategray" ) +
+#   geom_text(aes(x = 1.65, y = -20, label =  sprintf("\u2193")) , 
+#            size = ss , color = "darkslategray" ) +
+  #geom_text(aes(x = 1.65, y = -60, label = "diversity \nincrease") , 
+  #          size = ss , color = "darkslategray" ) +
+
+  theme(axis.text.x = element_blank() , axis.ticks.x = element_blank(), axis.text.y = element_text(size=14)  ) + theme_classic() +
+  scale_fill_manual(values =  abx.cols2) +
+  scale_color_manual(values =  abx.cols2) +
+  ylim(-70, 100) +
+  coord_cartesian(xlim =c(1 , 1.25) ) +
+  theme(aspect.ratio = 1.5/1) +
+
+  labs(x = "Antibiotic",  y="% Change in Diversity \n(Screening to Day 1)", color="Antibiotic", fill="Antibiotic")
+
+ggsave(filename = here(results_abx, paste(Sys.Date(), taxplot,"Diversity Change_Fidaxo_Vanco Dosed Figure 3B.pdf", sep = " ")), 
+       width = 6, height = 4)
+
+```
+
+
+ 
+##LME model correlating abx length with VE303 exposure up to Day 14 or Day 28
+# Table S4A
+
+```{r}
+days_stat <- "Day7_to_Day14"
+
+plot_corr  <- ve303.dnameta_plot.alt %>% 
+  filter(TRT.norm != "Placebo" & Day.in.treatment  < 18 & Day.in.treatment > 4 )
+ 
+
+plot_corr$log_relabun  <- log10(0.001+100*plot_corr$est_relative_abundance_panel_alt)
+
+data <- split(plot_corr, plot_corr$organism )
+
+
+model_all_list <- lapply(data, function(X){
+  model <- as.data.frame(summary(lmerTest::lmer( log_relabun ~    
+                                                  treat.day.len.abx + TRT.norm + 
+                                                  (1 | Subject.Number), X, REML = F))$coefficients)
+
+  model$Effect <- rownames(model)
+  model$Species <- X$organism[1]
+ return(model)} )
+
+model_all <- (do.call(rbind, model_all_list)) %>% 
+  rename(p = `Pr(>|t|)` ) 
+
+model_all <- model_all %>%  filter(!grepl("Intercept", Effect))
+
+model_save <- split(model_all, model_all$Effect)
+model_save1 <- lapply(model_save, function(X){
+  X <- X %>% arrange(p) 
+  X$p_adjusted <- p.adjust(X$p, method = "BH")
+  return(X)})
+
+ 
+writexl::write_xlsx(model_save1, here(results_abx,  paste(Sys.Date(),  taxplot, days_stat, "LME Results VE303 vs ABX length Table S4A" , ".xlsx", sep=" ")) )
+
+model_save1
+
+
+p_vals_exposure_abxlen_14 <- model_save1$treat.day.len.abx %>% select(Species, p_adjusted) %>% rename(organism = Species)
+p_vals_exposure_abxlen_14
+
+#######################
+```
+
+ 
+
+## Plot for VE303 exposure per strain in first 2 weeks vs length of on-study abx
+# Figure S1
+```{r}
+
+days_stat <- "Day7_to_Day14 meanpersub"
+
+################################################
+abx_strain_exposure_plotabxlen  <- abx_strain_exposure_d14 %>%
+  group_by(organism) %>%
+  mutate(spearman_cor = cor(exposure_perstrain, treat.day.len.abx, method = "spearman")) %>%
+  ungroup() %>%
+  mutate(Cor_labels = paste0("Spearman R = \n", signif(spearman_cor,2)) )  %>% 
+  left_join(p_vals_exposure_abxlen_14, by = "organism") %>%
+  mutate(p_labels = paste0("p = ", signif(p_adjusted,3)) )  %>%
+  group_by(organism) %>% 
+  mutate(maxval=max(exposure_perstrain)*1.05) %>% 
+  mutate(minval=min(exposure_perstrain)*10.05) %>% 
+  ungroup() 
+ 
+################################################
+
+
+ve303_corrabxdays <- ggplot(abx_strain_exposure_plotabxlen %>% filter(TRT.norm != "Placebo" & organism %in% c("VE303-02", "VE303-03","VE303-07","VE303-08") ),  
+                         aes(y = 0.01+(100*exposure_perstrain), x=  treat.day.len.abx )) + 
+  geom_point( pch = 21 ,size = 3, color = "midnightblue" , fill = "midnightblue",alpha = 0.7 ) +
+  geom_text(aes(20, 0.02+ minval , label = Cor_labels) , 
+            size = 3.5 , color = "darkslategray" ) +
+  facet_wrap(~organism, scales = "free" ) + 
+  theme_classic() +
+  scale_y_log10()+
+  #scale_x_log10()+
+ geom_smooth(method = "lm",
+              formula = y ~ x) +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5, vjust = 0.5, size = 10)) +
+  theme(axis.text.y = element_text(size=10), strip.text = element_text(size=10) ) +
+
+  labs(x="N days of SoC antibiotics", y="Log Mean % Abundance per Subject \n(4 weeks)")
+  ggsave(filename = here(results_abx, paste(Sys.Date(), taxplot, days_stat,"Abxlen vs Individual VE303 Corr_Figure S1.png", sep = " ")),  width = 7, height = 6.5, dpi = 600)
+  
+ 
+```
+
+# CHECK TO MAKE SURE DAY 14 MODEL P VALUES ARE BEING PLOTTED. If the label printed is not "Till_D14", go up to code chunk where p_vals_exposure was calculated and adjust the days included in model.
+
+```{r}
+print("Exposure p values calculated with data points ~")
+print(daylabel)
+
+```
+# Combine all sub-panels to create full Figure 3
+```{r}
+
+vanco_dy_dosed <-  vanco_dy_dosed + theme_classic() + theme(legend.position = "none" , axis.text.x = element_text(angle = 0,size = 11.5, hjust = 0.5, vjust = 0.5), strip.text.x = element_text(size = 12)) 
+
+ve303_corrvanc <- ve303_corrvanc + theme(strip.text = element_text(size = 12) , axis.text.x = element_text(size = 10.5), panel.spacing = unit(0.25, "lines"))  
+ 
+####################
+
+ss <- 3
+av_ex_dosed_alt <- av_ex_dosed_14 + theme(legend.position = "none" )
+
+delta_div_dosed <- delta_div_dosed +theme(axis.text.x = element_blank()) +
+  coord_cartesian(xlim =c(1 , 1.35) ) +
+    geom_text(aes(x = 1.37, y = 40, label =  sprintf("\u2191")) , 
+            size = 3.5, color = "darkslateblue" ) +
+  geom_text(aes(x = 1.7, y = 40, label = "effective \nclearance") , 
+            size = ss , color = "darkslateblue" ) +
+  geom_text(aes(x = 1.7, y = 0, label = "no \nchange") , 
+            size = ss , color = "darkslateblue" ) +
+  theme(aspect.ratio = 1.3/1)
+
+p1 <- av_ex_dosed_alt + delta_div_dosed +   plot_layout( widths =  c(1, 0.25) )
+ 
+
+patch <-  p1 / vanco_dy_dosed + ve303_corrvanc +   plot_layout(heights =  c(1, 1,2.5), widths =  c(1, 0.75,1) ) +plot_annotation(tag_levels = 'A')
+
+ggsave(filename = here(results_abx, paste(Sys.Date(), taxplot,"VE303 Dose_DIVERSITY_Vanco_Dynamics 2WK FIGURE3.png", sep = " ")),  width = 11.5, height = 13, dpi = 800)
+
+```
+
+   
+ 
+
+
+         
+ 
+

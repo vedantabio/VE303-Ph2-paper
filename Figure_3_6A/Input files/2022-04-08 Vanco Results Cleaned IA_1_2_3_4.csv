@@ -1,0 +1,261 @@
+"Sample.ID.metabolite","Analyte","conc","dilution_factor","ULOQ","LLOQ","Collection Date","Time Point","concentration_corrected","Sample.ID.short","TRT.norm","Subject.Number","Visit.Name","MGS.Sample.ID","Begin.Date"
+"BK7633407","Vancomycin","5462",10,2000,2,"4-Sep-19","Predose",5462,"BK76334",NA,NA,NA,NA,NA
+"BK7633626","Vancomycin","BLOQ",1,2000,2,"11-Sep-19","(parent visit)",2,"BK76336",NA,NA,NA,NA,NA
+"BF4959226","Vancomycin","4864",10,2000,2,"3-Sep-19","(parent visit)",4864,"BF49592","VE303 Low Dose",100601,"Day 7","BF4959223AB",2019-08-28
+"BF4959107","Vancomycin","10509",10,2000,2,"27-Aug-19","Predose",10509,"BF49591","VE303 Low Dose",100601,"Day 1","BF4959104AB",2019-08-28
+"BQ5345007","Vancomycin","13087",10,2000,2,"2-Mar-20","Predose",13087,"BQ53450","Placebo",100802,"Day 1","BQ5345004AB",2020-03-02
+"BP3915126","Vancomycin","BLOQ",1,2000,2,"11-Mar-20","(parent visit)",2,"BP39151","Placebo",100802,"UNSCHED","BP3915123AB",2020-03-02
+"BG1869926","Vancomycin","1.87",1,2000,2,"20-Aug-19","(parent visit)",1.87,"BG18699","Placebo",101101,"Day 7","BG1869923AB",2019-08-13
+"BI5710507","Vancomycin","7827",10,2000,2,"13-Aug-19","Predose",7827,"BI57105","Placebo",101101,"Day 1","BI5710504AB",2019-08-13
+"BI5710807","Vancomycin","16861",10,2000,2,"2-Dec-19","Predose",16861,"BI57108","VE303 Low Dose",101104,"Day 1","BI5710804AB",2019-12-02
+"BI5711126","Vancomycin","BLOQ",1,2000,2,"10-Dec-19","(parent visit)",2,"BI57111","VE303 Low Dose",101104,"Day 7","BI5711123AB",2019-12-02
+"BI5710707","Vancomycin","3070",10,2000,2,"6-Jan-20","Predose",3070,"BI57107","VE303 Low Dose",101105,"Day 1","BI5710704AB",2020-01-06
+"BI5711226","Vancomycin","BLOQ",1,2000,2,"13-Jan-20","(parent visit)",2,"BI57112","VE303 Low Dose",101105,"Day 7","BI5711223AB",2020-01-06
+"BP9231826","Vancomycin","133",1,2000,2,"31-Jan-20","(parent visit)",133,"BP92318",NA,NA,NA,NA,NA
+"BP3744026","Vancomycin","164",1,2000,2,"9-Mar-20","(parent visit)",164,"BP37440","VE303 Low Dose",101106,"Day 7","BP3744023AB",2020-03-03
+"BP3743607","Vancomycin","5244",10,2000,2,"3-Mar-20","Predose",5244,"BP37436","VE303 Low Dose",101106,"Day 1","BP3743604AB",2020-03-03
+"BL0415626","Vancomycin","BLOQ",1,2000,2,"10-Jan-20","(parent visit)",2,"BL04156","Placebo",101203,"Day 7","BL0415623AB",2020-01-03
+"BL0415307","Vancomycin","ALOQ",1,2000,2,"3-Jan-20","Predose",2000,"BL04153","Placebo",101203,"Day 1","BL0415304AB",2020-01-03
+"BH3870807","Vancomycin","13961",10,2000,2,"5-Dec-19","Predose",13961,"BH38708","VE303 High Dose",101903,"Day 1","BH3870804AB",2019-12-05
+"BH3870926","Vancomycin","2.5",1,2000,2,"12-Dec-19","(parent visit)",2.5,"BH38709","VE303 High Dose",101903,"Day 7","BH3870923AB",2019-12-05
+"BG8045806","Vancomycin","ALOQ",10,2000,2,"16-Jul-19","Predose",20000,"BG80458","Placebo",102101,"Day 1","BG8045804AB",2019-07-16
+"BG8045925","Vancomycin","11761",10,2000,2,"23-Jul-19","(parent visit)",11761,"BG80459","Placebo",102101,"Day 7","BG8045924AB",2019-07-16
+"BK1307426","Vancomycin","10839",10,2000,2,"23-Sep-19","(parent visit)",10839,"BK13074","Placebo",102101,"UNSCHED","BK1307423AB",2019-07-16
+"BJ9825426","Vancomycin","3339",10,2000,2,"8-Aug-19","(parent visit)",3339,"BJ98254","VE303 High Dose",103101,"Day 7","BJ9825423AB",2019-08-01
+"BJ9825107","Vancomycin","16380",10,2000,2,"31-Jul-19","Predose",16380,"BJ98251","VE303 High Dose",103101,"Day 1","BJ9825104AB",2019-08-01
+"BI2562406","Vancomycin","4791",10,2000,2,"8-Aug-19","Predose",4791,"BI25624","VE303 Low Dose",103102,"Day 1","BI2562404AB",2019-08-08
+"BJ9825525","Vancomycin","6339",10,2000,2,"15-Aug-19","(parent visit)",6339,"BJ98255",NA,NA,NA,NA,NA
+"BK1494325","Vancomycin","BLOQ",1,2000,2,"2-Jan-20","(parent visit)",2,"BK14943","VE303 Low Dose",103102,"UNSCHED","BK1494323AB",2019-08-08
+"BJ9825206","Vancomycin","16141",10,2000,2,"9-Dec-19","Predose",16141,"BJ98252","Placebo",103103,"Day 1","BJ9825204AB",2019-12-09
+"BK1494625","Vancomycin","2.58",1,2000,2,"18-Dec-19","(parent visit)",2.58,"BK14946","Placebo",103103,"UNSCHED","BK1494623AB",2019-12-09
+"BJ9825625","Vancomycin","4.99",1,2000,2,"16-Dec-19","(parent visit)",4.99,"BJ98256","Placebo",103103,"Day 7","BJ9825623AB",2019-12-09
+"BK1494225","Vancomycin","BLOQ",1,2000,2,"17-Jan-20","(parent visit)",2,"BK14942","Placebo",103103,"UNSCHED","BK1494223AB",2019-12-09
+"BP3746025","Vancomycin","BLOQ",1,2000,2,"21-Feb-20","(parent visit)",2,"BP37460","Placebo",103103,"UNSCHED","BP3746023AB",2019-12-09
+"BT7077725","Vancomycin","BLOQ",1,2000,2,"15-Jul-20","(parent visit)",2,"BT70777","VE303 Low Dose",103203,"UNSCHED","BT7077723AB",2020-04-20
+"BJ8848006","Vancomycin","6656",10,2000,2,"18-Sep-19","Predose",6656,"BJ88480","VE303 Low Dose",103303,"UNSCHED","BJ8848004AB",2019-09-30
+"BJ8848206","Vancomycin","6297",10,2000,2,"30-Sep-19","Predose",6297,"BJ88482","VE303 Low Dose",103303,"Day 1","BJ8848204AB",2019-09-30
+"BJ8848525","Vancomycin","499",1,2000,2,"7-Oct-19","(parent visit)",499,"BJ88485","VE303 Low Dose",103303,"Day 7","BJ8848523AB",2019-09-30
+"BK0693525","Vancomycin","4.39",1,2000,2,"19-Dec-19","(parent visit)",4.39,"BK06935","VE303 Low Dose",103801,"Day 7","BK0693523AB",2019-12-13
+"BK0693406","Vancomycin","7451",10,2000,2,"13-Dec-19","Predose",7451,"BK06934","VE303 Low Dose",103801,"Day 1","BK0693404AB",2019-12-13
+"BK0693325","Vancomycin","BLOQ",1,2000,2,"31-Dec-19","(parent visit)",2,"BK06933","VE303 Low Dose",103801,"UNSCHED","BK0693323AB",2019-12-13
+"BK2133125","Vancomycin","4009",10,2000,2,"18-Sep-19","(parent visit)",4009,"BK21331","VE303 High Dose",104001,"Day 7","BK2133123AB",2019-09-12
+"BK2133006","Vancomycin","8831",10,2000,2,"12-Sep-19","Predose",8831,"BK21330","VE303 High Dose",104001,"Day 1","BK2133004AB",2019-09-12
+"BL5735406","Vancomycin","BLOQ",1,2000,2,"9-Jan-20","Predose",2,"BL57354","VE303 High Dose",104002,"Day 1","BL5735404AB",2020-01-09
+"BL9370906","Vancomycin","3423",10,2000,2,"30-Oct-19","Predose",3423,"BL93709","Placebo",105501,"Day 1","BL9370904AB",2019-10-30
+"BL9371025","Vancomycin","BLOQ",1,2000,2,"6-Nov-19","(parent visit)",2,"BL93710","Placebo",105501,"Day 7","BL9371023AB",2019-10-30
+"BP3831025","Vancomycin","BLOQ",1,2000,2,"26-Feb-20","(parent visit)",2,"BP38310","Placebo",105501,"UNSCHED","BP3831004AB",2019-10-30
+"BI4243625","Vancomycin","BLOQ",1,2000,2,"29-Oct-19","(parent visit)",2,"BI42436","VE303 High Dose",200101,"Day 7","BI4243623AB",2019-10-23
+"BI4243506","Vancomycin","BLOQ",1,2000,2,"22-Oct-19","Predose",2,"BI42435","VE303 High Dose",200101,"Day 1","BI4243504AB",2019-10-23
+"BJ2606226","Vancomycin","BLOQ",1,2000,2,"13-Feb-20","(parent visit)",2,"BJ26062","VE303 High Dose",200101,"UNSCHED","BJ2606223AB",2019-10-23
+"BP3929826","Vancomycin","431",1,2000,2,"12-Mar-20","(parent visit)",431,"BP39298","VE303 Low Dose",200201,"Day 7","BP3929823AB",2020-03-05
+"BP3929607","Vancomycin","8410",10,2000,2,"5-Mar-20","Predose",8410,"BP39296","VE303 Low Dose",200201,"Day 1","BP3929604AB",2020-03-05
+"BH7033607","Vancomycin","11972",10,2000,2,"25-Jul-19","Predose",11972,"BH70336","VE303 High Dose",200301,"Day 1","BH7033604AB",2019-07-26
+"BH7033726","Vancomycin","26.9",1,2000,2,"1-Aug-19","(parent visit)",26.9,"BH70337","VE303 High Dose",200301,"Day 7","BH7033723AB",2019-07-26
+"BP3855807","Vancomycin","QNS",1,2000,2,"5-Mar-20","Predose",NA,"BP38558","Placebo",200303,"Day 1","BP3855804AB",2020-03-05
+"BP3856326","Vancomycin","171",1,2000,2,"11-Mar-20","(parent visit)",171,"BP38563","Placebo",200303,"Day 7","BP3856323AB",2020-03-05
+"BQ1592807","Vancomycin","9580",10,2000,2,"21-Apr-20","Predose",9580,"BQ15928","VE303 High Dose",200601,"Day 1","BQ1592804AB",2020-04-22
+"BQ1593526","Vancomycin","BLOQ",1,2000,2,"29-Apr-20","(parent visit)",2,"BQ15935","VE303 High Dose",200601,"Day 7","BQ1593523AB",2020-04-22
+"BQ1593326","Vancomycin","QNS",1,2000,2,"22-May-20","(parent visit)",NA,"BQ15933","Placebo",200602,"Day 7","BQ1593323AB",2020-05-01
+"BQ1592707","Vancomycin","10802",10,2000,2,"1-May-20","Predose",10802,"BQ15927","Placebo",200602,"Day 1","BQ1592704AB",2020-05-01
+"BF2455507","Vancomycin","17470",10,2000,2,"8-Feb-19","Predose",17470,"BF24555","VE303 High Dose",100501,"Day 1","BF2455504AB",2019-02-08
+"BF2456626","Vancomycin","1279",1,2000,2,"14-Feb-19","(parent visit)",1279,"BF24566","VE303 High Dose",100501,"Day 7","BF2456623AB",2019-02-08
+"BP3761008","Vancomycin","BLOQ",1,2000,2,"21-Jul-20","Predose",2,"BP37610","VE303 High Dose",104004,"Day 1","BP3761005AB",2020-07-21
+"BR3952208","Vancomycin","13875",10,2000,2,"13-Aug-20","Predose",13875,"BR39522","Placebo",200609,"Day 1","BR3952204AB",2020-08-13
+"BP3743408","Vancomycin","17025",10,2000,2,"6-Aug-20","Predose",17025,"BP37434","VE303 High Dose",101108,"Day 1","BP3743404AB",2020-08-06
+"BR3952008","Vancomycin","7878",10,2000,2,"29-May-20","Predose",7878,"BR39520","Placebo",200604,"Day 1","BR3952004AB",2020-05-29
+"BR3952108","Vancomycin","8060",10,2000,2,"4-Aug-20","Predose",8060,"BR39521","VE303 High Dose",200608,"Day 1","BR3952104AB",2020-08-05
+"BR3952308","Vancomycin","12619",10,2000,2,"29-May-20","Predose",12619,"BR39523","VE303 Low Dose",200603,"Day 1","BR3952304AB",2020-05-29
+"BS7569408","Vancomycin","14421",10,2000,2,"28-Jul-20","Predose",14421,"BS75694","VE303 Low Dose",200607,"Day 1","BS7569404AB",2020-07-28
+"BP3831608","Vancomycin","11496",10,2000,2,"24-Jul-20","Predose",11496,"BP38316","VE303 Low Dose",105502,"Day 1","BP3831604AB",2020-07-24
+"BP3872208","Vancomycin","3676",10,2000,2,"12-Aug-20","Predose",3676,"BP38722","VE303 High Dose",100401,"Day 1","BP3872204AB",2020-08-12
+"BP3746508","Vancomycin","BLOQ",1,2000,2,"18-Jun-20","Predose",2,"BP37465","VE303 Low Dose",103104,"Day 1","BP3746504AB",2020-06-18
+"BP3914908","Vancomycin","QNS",1,2000,2,"1-Jul-20","Predose",NA,"BP39149","VE303 Low Dose",100803,"Day 1","BP3914904AB",2020-07-01
+"BQ6053008","Vancomycin","10229",10,2000,2,"22-Jun-20","Predose",10229,"BQ60530","VE303 High Dose",200202,"Day 1","BQ6053004AB",2020-06-23
+"BP3743508","Vancomycin","14960",10,2000,2,"21-Jul-20","Predose",14960,"BP37435",NA,NA,NA,NA,NA
+"BP3755508","Vancomycin","6493",10,2000,2,"12-Aug-20","Predose",6493,"BP37555","Placebo",103305,"Day 1","BP3755504AB",2020-08-13
+"BT0479708","Vancomycin","7062",10,2000,2,"2-Sep-20","Predose",7062,"BT04797","VE303 High Dose",105301,"Day 1","BT0479704AB",2020-09-02
+"BP3840608","Vancomycin","QNS",1,2000,2,"31-Aug-20","Predose",NA,"BP38406","VE303 High Dose",105802,"Day 1","BP3840604AB",2020-08-31
+"BP3746608","Vancomycin","BLOQ",1,2000,2,"14-Aug-20","Predose",2,"BP37466","Placebo",103105,"Day 1","BP3746604AB",2020-08-13
+"BQ1610708","Vancomycin","12280",10,2000,2,"2-Sep-20","Predose",12280,"BQ16107","VE303 Low Dose",200801,"Day 1","BQ1610704AB",2020-09-03
+"BP3764308","Vancomycin","ALOQ",10,2000,2,"7-Oct-20","Predose",20000,"BP37643","VE303 High Dose",200703,"Day 1","BP3764304AB",2020-10-07
+"BQ6053227","Vancomycin","599",1,2000,2,"29-Jun-20","(parent visit)",599,"BQ60532","VE303 High Dose",200202,"Day 7","BQ6053223AB",2020-06-23
+"BS7570727","Vancomycin","565",1,2000,2,"10-Aug-20","(parent visit)",565,"BS75707","VE303 High Dose",200608,"Day 7","BS7570723AB",2020-08-05
+"BP3744227","Vancomycin","174",1,2000,2,"27-Jul-20","(parent visit)",174,"BP37442","Placebo",101107,"Day 7","BP3744223AB",2020-07-22
+"BR3952927","Vancomycin","10487",10,2000,2,"3-Aug-20","(parent visit)",10487,"BR39529","VE303 Low Dose",200607,"Day 7","BR3952923AB",2020-07-28
+"BQ1593427","Vancomycin","98.1",1,2000,2,"4-Jun-20","(parent visit)",98.1,"BQ15934","Placebo",200604,"Day 7","BQ1593423AB",2020-05-29
+"BS7570827","Vancomycin","346",1,2000,2,"29-Jun-20","(parent visit)",346,"BS75708","VE303 Low Dose",200606,"Day 7","BS7570823AB",2020-06-24
+"BP3914708","Vancomycin","BLOQ",1,2000,2,"9-Jul-20","(parent visit)",2,"BP39147","VE303 Low Dose",100803,"Day 7","BP3914704AB",2020-07-01
+"BP3747227","Vancomycin","BLOQ",1,2000,2,"24-Jun-20","(parent visit)",2,"BP37472","VE303 Low Dose",103104,"Day 7","BP3747223AB",2020-06-18
+"BP3761727","Vancomycin","BLOQ",1,2000,2,"27-Jul-20","(parent visit)",2,"BP37617","VE303 High Dose",104004,"Day 7","BP3761723AB",2020-07-21
+"BP3744127","Vancomycin","35.3",1,2000,2,"12-Aug-20","(parent visit)",35.3,"BP37441","VE303 High Dose",101108,"Day 7","BP3744123AB",2020-08-06
+"BS7570427","Vancomycin","BLOQ",1,2000,2,"24-Jun-20","(parent visit)",2,"BS75704","Placebo",200605,"Day 7","BS7570423AB",2020-06-18
+"BP3832227","Vancomycin","8193",10,2000,2,"29-Jul-20","(parent visit)",8193,"BP38322","VE303 Low Dose",105502,"Day 7","BP3832223AB",2020-07-24
+"BP3756027","Vancomycin","122",1,2000,2,"20-Aug-20","(parent visit)",122,"BP37560","Placebo",103305,"Day 7","BP3756023AB",2020-08-13
+"BP3747027","Vancomycin","BLOQ",1,2000,2,"19-Aug-20","(parent visit)",2,"BP37470","Placebo",103105,"Day 7","BP3747023AB",2020-08-13
+"BT0480027","Vancomycin","BLOQ",1,2000,2,"8-Sep-20","(parent visit)",2,"BT04800","VE303 High Dose",105301,"Day 7","BT0480023AB",2020-09-02
+"BP3872427","Vancomycin","BLOQ",1,2000,2,"19-Aug-20","(parent visit)",2,"BP38724","VE303 High Dose",100401,"Day 7","BP3872423AB",2020-08-12
+"BS7570627","Vancomycin","2900",10,2000,2,"20-Aug-20","(parent visit)",2900,"BS75706","Placebo",200609,"Day 7","BS7570623AB",2020-08-13
+"BQ1611227","Vancomycin","288",1,2000,2,"9-Sep-20","(parent visit)",288,"BQ16112","VE303 Low Dose",200801,"Day 7","BQ1611223AB",2020-09-03
+"BP3764927","Vancomycin","6.25",1,2000,2,"14-Oct-20","(parent visit)",6.25,"BP37649","VE303 High Dose",200703,"Day 7","BP3764923AB",2020-10-07
+"BS6352527","Vancomycin","BLOQ",1,2000,2,"11-Jul-20","(parent visit)",2,"BS63525","VE303 Low Dose",200606,"UNSCHED","BS6352523AB",2020-06-24
+"BT7857727","Vancomycin","BLOQ",1,2000,2,"3-Aug-20","(parent visit)",2,"BT78577","Placebo",200605,"UNSCHED","BT7857723AB",2020-06-18
+"BT7857427","Vancomycin","BLOQ",1,2000,2,"11-Aug-20","(parent visit)",2,"BT78574","VE303 Low Dose",200607,"UNSCHED","BT7857423AB",2020-07-28
+"BQ1610227","Vancomycin","2.36",1,2000,2,"14-Sep-20","(parent visit)",2.36,"BQ16102","VE303 Low Dose",200801,"UNSCHED","BQ1610223AB",2020-09-03
+"BT7857527","Vancomycin","BLOQ",1,2000,2,"26-Sep-20","(parent visit)",2,"BT78575","Placebo",200609,"UNSCHED","BT7857523AB",2020-08-13
+"BS6352725","Vancomycin","111",1,2000,2,"2-Jun-20","(parent visit)",111,"BS63527","VE303 Low Dose",200603,"UNSCHED","BS6352723AB",2020-05-29
+"BP6179525","Vancomycin","QNS",1,2000,2,"17-Aug-20","(parent visit)",NA,"BP61795","VE303 High Dose",101108,"UNSCHED","BP6179523AB",2020-08-06
+"BT7857625","Vancomycin","BLOQ",1,2000,2,"26-Aug-20","(parent visit)",2,"BT78576","VE303 High Dose",200608,"UNSCHED","BT7857623AB",2020-08-05
+"BS7569709","Vancomycin","10261",10,2000,2,"23-Jun-20","Predose",10261,"BS75697","VE303 Low Dose",200606,"Day 1","BS7569704AB",2020-06-24
+"BS7569509","Vancomycin","BLOQ",1,2000,2,"19-Jun-20","Predose",2,"BS75695","Placebo",200605,"Day 1","BS7569504AB",2020-06-18
+"BP3752506","Vancomycin","22.4",1,2000,2,"20-Apr-20","Predose",22.4,"BP37525",NA,NA,NA,NA,NA
+"BP3753125","Vancomycin","BLOQ",1,2000,2,"27-Apr-20","(parent visit)",2,"BP37531","VE303 Low Dose",103203,"Day 7","BP3753123AB",2020-04-20
+"BV0010926","Vancomycin","2.45",1,2000,2,"21-Sep-20","(parent visit)",2.45,"BV00109","Placebo",104006,"Screening","BV0010923AB",2020-10-01
+"BP3755307","Vancomycin","9030",10,2000,2,"28-Dec-20","Predose",9030,"BP37553","VE303 High Dose",103306,"Day 1","BP3755304AB",2020-12-29
+"BV9354226","Vancomycin","6588",10,2000,2,"21-Jan-21","(parent visit)",6588,"BV93542","VE303 High Dose",101111,"Screening","BV9354223AB",2021-02-02
+"BP3840707","Vancomycin","11052",10,2000,2,"18-Dec-20","Predose",11052,"BP38407","VE303 High Dose",105805,"Day 1","BP3840704AB",2020-12-18
+"BQ1592907","Vancomycin","BLOQ",1,2000,2,"15-Dec-20","Predose",2,"BQ15929","VE303 Low Dose",200614,"Day 1","BQ1592904AB",2020-12-15
+"BS6352607","Vancomycin","BLOQ",1,2000,2,"9-Jul-20","(parent visit)",2,"BS63526",NA,NA,NA,NA,NA
+"BP3785926","Vancomycin","134",1,2000,2,"9-Feb-21","(parent visit)",134,"BP37859","VE303 High Dose",103106,"Day 7","BP3785923AB",2021-02-03
+"BP3764726","Vancomycin","895",1,2000,2,"1-Apr-21","(parent visit)",895,"BP37647","VE303 High Dose",200402,"Day 7","BP3764723AB",2021-03-26
+"BW4832426","Vancomycin","12665",10,2000,2,"14-Dec-20","(parent visit)",12665,"BW48324","VE303 High Dose",105805,"Screening","BW4832423AB",2020-12-18
+"BP3755926","Vancomycin","320",1,2000,2,"3-Jan-21","(parent visit)",320,"BP37559","VE303 High Dose",103306,"Day 7","BP3755923AB",2020-12-29
+"BP3830426","Vancomycin","ALOQ",1,2000,2,"4-Feb-21","(parent visit)",2000,"BP38304","VE303 Low Dose",105504,"Screening","BP3830423AB",2021-02-17
+"BP3830326","Vancomycin","BLOQ",1,2000,2,"8-Jan-21","(parent visit)",2,"BP38303","VE303 Low Dose",105503,"Screening","BP3830323AB",2021-01-28
+"BS7571826","Vancomycin","BLOQ",1,2000,2,"21-Apr-21","(parent visit)",2,"BS75718","VE303 High Dose",200619,"Day 14","BS7571823AB",2021-04-08
+"BQ9051526","Vancomycin","BLOQ",1,2000,2,"24-Nov-20","(parent visit)",2,"BQ90515","Placebo",104006,"Day 56","BQ9051523AB",2020-10-01
+"BQ9051426","Vancomycin","BLOQ",1,2000,2,"24-Nov-20","(parent visit)",2,"BQ90514","VE303 High Dose",104007,"Day 56","BQ9051423AB",2020-10-01
+"CA5529507","Vancomycin","BLOQ",1,2000,2,"18-Feb-21","Predose",2,"CA55295","Placebo",104011,"Day 1","CA5529504AB",2021-02-16
+"CA5530226","Vancomycin","BLOQ",1,2000,2,"22-Feb-21","(parent visit)",2,"CA55302","Placebo",104011,"Day 7","CA5530223AB",2021-02-16
+"BP3859526","Vancomycin","713",1,2000,2,"29-Nov-20","(parent visit)",713,"BP38595","Placebo",200401,"Day 7","BP3859523AB",2020-11-24
+"BQ3401626","Vancomycin","84.1",1,2000,2,"14-Dec-20","(parent visit)",84.1,"BQ34016","VE303 Low Dose",104009,"Screening","BQ3401623AB",2020-12-28
+"BP3832126","Vancomycin","21.7",1,2000,2,"23-Feb-21","(parent visit)",21.7,"BP38321","VE303 Low Dose",105504,"Day 7","BP3832123AB",2021-02-17
+"BP3810826","Vancomycin","BLOQ",1,2000,2,"4-Jan-21","(parent visit)",2,"BP38108","VE303 Low Dose",104009,"Day 7","BP3810823AB",2020-12-28
+"BV1613107","Vancomycin","BLOQ",1,2000,2,"14-Dec-20","Predose",2,"BV16131","VE303 Low Dose",104009,"Day 1","BV1613104AB",2020-12-28
+"BP3752407","Vancomycin","BLOQ",1,2000,2,"12-Oct-20","Predose",2,"BP37524","VE303 Low Dose",103204,"Day 1","BP3752404AB",2020-10-09
+"BP3762326","Vancomycin","53.2",1,2000,2,"14-Oct-20","(parent visit)",53.2,"BP37623","VE303 High Dose",104007,"Day 14","BP3762323AB",2020-10-01
+"BP3751326","Vancomycin","BLOQ",1,2000,2,"28-Sep-20","(parent visit)",2,"BP37513","VE303 Low Dose",103204,"Screening","BP3751323AB",2020-10-09
+"BT7831726","Vancomycin","11.7",1,2000,2,"14-Apr-21","(parent visit)",11.7,"BT78317","VE303 High Dose",200619,"Day 7","BT7831723AB",2021-04-08
+"BP3863126","Vancomycin","BLOQ",1,2000,2,"28-Oct-20","(parent visit)",2,"BP38631","VE303 Low Dose",200501,"Day 14","BP3863123AB",2020-10-16
+"BP3785307","Vancomycin","20575",10,2000,2,"2-Feb-21","Predose",20575,"BP37853","VE303 High Dose",103106,"Day 1","BP3785304AB",2021-02-03
+"BR2437426","Vancomycin","BLOQ",1,2000,2,"22-Mar-21","(parent visit)",2,"BR24374","Placebo",200304,"Day 56","BR2437423AB",2021-01-26
+"BV0298626","Vancomycin","BLOQ",1,2000,2,"15-Dec-20","(parent visit)",2,"BV02986","VE303 Low Dose",100803,"Day 168","BV0298623AB",2020-07-01
+"BP3752926","Vancomycin","BLOQ",1,2000,2,"15-Oct-20","(parent visit)",2,"BP37529","VE303 Low Dose",103204,"Day 7","BP3752923AB",2020-10-09
+"BP3857026","Vancomycin","BLOQ",1,2000,2,"17-Feb-21","(parent visit)",2,"BP38570","VE303 Low Dose",200305,"Day 14","BP3857023AB",2021-02-05
+"BP3831507","Vancomycin","9714",10,2000,2,"17-Feb-21","Predose",9714,"BP38315","VE303 Low Dose",105504,"Day 1","BP3831504AB",2021-02-17
+"BU9527507","Vancomycin","6497",10,2000,2,"18-Nov-20","Predose",6497,"BU95275","VE303 High Dose",200612,"Day 1","BU9527504AB",2020-11-19
+"BU9528726","Vancomycin","BLOQ",1,2000,2,"2-Dec-20","(parent visit)",2,"BU95287","VE303 High Dose",200612,"Day 14","BU9528723AB",2020-11-19
+"BU9530026","Vancomycin","BLOQ",1,2000,2,"2-Dec-20","(parent visit)",2,"BU95300","Placebo",200611,"Day 56","BU9530023AB",2020-10-09
+"CC2397726","Vancomycin","BLOQ",1,2000,2,"16-Mar-21","(parent visit)",2,"CC23977","VE303 High Dose",200618,"Screening","CC2397723AB",2021-03-26
+"BU9528826","Vancomycin","BLOQ",1,2000,2,"1-Dec-20","(parent visit)",2,"BU95288","VE303 Low Dose",200613,"Day 14","BU9528823AB",2020-11-18
+"BU9527707","Vancomycin","13064",10,2000,2,"9-Oct-20","Predose",13064,"BU95277","Placebo",200611,"Day 1","BU9527704AB",2020-10-09
+"BP3761107","Vancomycin","13623",10,2000,2,"1-Oct-20","Predose",13623,"BP37611","VE303 High Dose",104007,"Day 1","BP3761104AB",2020-10-01
+"BP3760907","Vancomycin","19924",10,2000,2,"1-Oct-20","Predose",19924,"BP37609","Placebo",104006,"Day 1","BP3760904AB",2020-10-01
+"BS9433626","Vancomycin","BLOQ",1,2000,2,"27-Oct-20","(parent visit)",2,"BS94336","Placebo",101110,"Day 7","BS9433623AB",2020-10-22
+"BV1613007","Vancomycin","BLOQ",1,2000,2,"9-Oct-20","Predose",2,"BV16130","VE303 High Dose",104008,"Day 1","BV1613004AB",2020-10-09
+"BU2836226","Vancomycin","BLOQ",1,2000,2,"15-Oct-20","(parent visit)",2,"BU28362","VE303 High Dose",104008,"Day 7","BU2836223AB",2020-10-09
+"BP3858326","Vancomycin","BLOQ",1,2000,2,"16-Dec-20","(parent visit)",2,"BP38583","Placebo",200401,"UNSCHED","BP3858304AB",2020-11-24
+"BS7569607","Vancomycin","15796",10,2000,2,"21-Mar-21","Predose",15796,"BS75696","VE303 Low Dose",200617,"Day 1","BS7569604AB",2021-03-22
+"CC2403026","Vancomycin","BLOQ",1,2000,2,"8-Apr-21","(parent visit)",2,"CC24030","VE303 High Dose",200618,"Day 14","CC2403023AB",2021-03-26
+"BT7831307","Vancomycin","8929",10,2000,2,"8-Apr-21","Predose",8929,"BT78313","VE303 High Dose",200619,"Day 1","BT7831304AB",2021-04-08
+"CC3999226","Vancomycin","BLOQ",1,2000,2,"29-Apr-21","(parent visit)",2,"CC39992","VE303 High Dose",200615,"Day 56","CC3999223AB",2021-02-17
+"BP3855707","Vancomycin","12401",10,2000,2,"4-Feb-21","Predose",12401,"BP38557",NA,NA,NA,NA,NA
+"BP3765326","Vancomycin","BLOQ",1,2000,2,"9-Apr-21","(parent visit)",2,"BP37653","VE303 High Dose",200402,"Day 14","BP3765323AB",2021-03-26
+"CC2401107","Vancomycin","BLOQ",1,2000,2,"26-Mar-21","Predose",2,"CC24011","VE303 High Dose",200618,"Day 1","CC2401104AB",2021-03-26
+"CA5528126","Vancomycin","BLOQ",1,2000,2,"12-Feb-21","(parent visit)",2,"CA55281","Placebo",104011,"Screening","CA5528123AB",2021-02-16
+"BP3857626","Vancomycin","BLOQ",1,2000,2,"4-Mar-21","(parent visit)",2,"BP38576","VE303 High Dose",200402,"Screening","BP3857623AB",2021-03-26
+"BP6180226","Vancomycin","BLOQ",1,2000,2,"16-Dec-20","(parent visit)",2,"BP61802","Placebo",101110,"Day 56","BP6180223AB",2020-10-22
+"BT7831626","Vancomycin","BLOQ",1,2000,2,"11-Mar-21","(parent visit)",2,"BT78316","VE303 High Dose",200616,"Day 14","BT7831623AB",2021-02-26
+"BQ6051926","Vancomycin","BLOQ",1,2000,2,"19-Mar-21","(parent visit)",2,"BQ60519","VE303 High Dose",200619,"Screening","BQ6051923AB",2021-04-08
+"BR3953126","Vancomycin","8.12",1,2000,2,"24-Nov-20","(parent visit)",8.12,"BR39531","VE303 Low Dose",200613,"Day 7","BR3953123AB",2020-11-18
+"BS9433207","Vancomycin","5522",10,2000,2,"22-Oct-20","Predose",5522,"BS94332","Placebo",101110,"Day 1","BS9433204AB",2020-10-22
+"BV9355226","Vancomycin","63",1,2000,2,"7-Feb-21","(parent visit)",63,"BV93552","VE303 High Dose",101111,"Day 7","BV9355223AB",2021-02-02
+"BP3856526","Vancomycin","BLOQ",1,2000,2,"31-Jan-21","(parent visit)",2,"BP38565","Placebo",200304,"Day 7","BP3856523AB",2021-01-26
+"BZ2249426","Vancomycin","BLOQ",1,2000,2,"24-Feb-21","(parent visit)",2,"BZ22494","VE303 High Dose",103306,"Day 56","BZ2249423AB",2020-12-29
+"BP3861326","Vancomycin","BLOQ",1,2000,2,"9-Dec-20","(parent visit)",2,"BP38613","VE303 Low Dose",200501,"Day 56","BP3861323AB",2020-10-16
+"BU9526725","Vancomycin","20.5",1,2000,2,"4-Feb-21","(parent visit)",20.5,"BU95267","VE303 High Dose",200615,"Screening","BU9526723AB",2021-02-17
+"CC3999126","Vancomycin","BLOQ",1,2000,2,"8-Feb-21","(parent visit)",2,"CC39991","VE303 Low Dose",200614,"Day 56","CC3999123AB",2020-12-15
+"BV1613226","Vancomycin","BLOQ",1,2000,2,"14-Oct-20","(parent visit)",2,"BV16132","Placebo",104006,"Day 14","BV1613223AB",2020-10-01
+"BP7180026","Vancomycin","BLOQ",1,2000,2,"16-Jan-21","(parent visit)",2,"BP71800","VE303 High Dose",103106,"Screening","BP7180023AB",2021-02-03
+"BY3568426","Vancomycin","BLOQ",1,2000,2,"19-Feb-21","(parent visit)",2,"BY35684","VE303 Low Dose",104010,"Day 7","BY3568423AB",2021-02-12
+"BP3860026","Vancomycin","BLOQ",1,2000,2,"7-Dec-20","(parent visit)",2,"BP38600","Placebo",200401,"Day 14","BP3860023AB",2020-11-24
+"BU9528326","Vancomycin","78.4",1,2000,2,"24-Nov-20","(parent visit)",78.4,"BU95283","VE303 High Dose",200612,"Day 7","BU9528323AB",2020-11-19
+"BP3858707","Vancomycin","14528",10,2000,2,"23-Nov-20","Predose",14528,"BP38587","Placebo",200401,"Day 1","BP3858704AB",2020-11-24
+"BP3854726","Vancomycin","11230",10,2000,2,"29-Jan-21","(parent visit)",11230,"BP38547","VE303 Low Dose",200305,"Screening","BP3854723AB",2021-02-05
+"CF2633506","Vancomycin","13123",10,2000,2,"26-Mar-21","Predose",13123,"CF26335","VE303 High Dose",200402,"Day 1","CF2633504AB",2021-03-26
+"BR3952826","Vancomycin","337",1,2000,2,"21-Dec-20","(parent visit)",337,"BR39528","VE303 Low Dose",200614,"Day 7","BR3952823AB",2020-12-15
+"BU9528226","Vancomycin","BLOQ",1,2000,2,"22-Feb-21","(parent visit)",2,"BU95282","VE303 High Dose",200615,"Day 7","BU9528223AB",2021-02-17
+"BS7569807","Vancomycin","7910",10,2000,2,"26-Feb-21","Predose",7910,"BS75698","VE303 High Dose",200616,"Day 1","BS7569804AB",2021-02-26
+"BS7568026","Vancomycin","BLOQ",1,2000,2,"11-Feb-21","(parent visit)",2,"BS75680","VE303 High Dose",200616,"Screening","BS7568023AB",2021-02-26
+"BP3857126","Vancomycin","BLOQ",1,2000,2,"8-Feb-21","(parent visit)",2,"BP38571","Placebo",200304,"Day 14","BP3857123AB",2021-01-26
+"BY3568207","Vancomycin","6.56",1,2000,2,"12-Feb-21","Predose",6.56,"BY35682","VE303 Low Dose",104010,"Day 1","BY3568204AB",2021-02-12
+"BV0011026","Vancomycin","14081",10,2000,2,"24-Sep-20","(parent visit)",14081,"BV00110","VE303 High Dose",104007,"Screening","BV0011024AB",2020-10-01
+"BY7682426","Vancomycin","BLOQ",1,2000,2,"9-Feb-21","(parent visit)",2,"BY76824","VE303 High Dose",105805,"Day 56","BY7682423AB",2020-12-18
+"BV0011226","Vancomycin","QNS",1,2000,2,"2-Oct-20","(parent visit)",NA,"BV00112","VE303 High Dose",104008,"Screening","BV0011223AB",2020-10-09
+"BP3862426","Vancomycin","5.84",1,2000,2,"21-Oct-20","(parent visit)",5.84,"BP38624","VE303 Low Dose",200501,"Day 7","BP3862423AB",2020-10-16
+"BS7570526","Vancomycin","2.05",1,2000,2,"4-Mar-21","(parent visit)",2.05,"BS75705","VE303 High Dose",200616,"Day 7","BS7570523AB",2021-02-26
+"CC5299526","Vancomycin","BLOQ",1,2000,2,"1-Dec-20","(parent visit)",2,"CC52995","VE303 High Dose",200703,"Day 56","CC5299523AB",2020-10-07
+"BU9526826","Vancomycin","3907",10,2000,2,"26-Nov-20","(parent visit)",3907,"BU95268","VE303 Low Dose",200614,"Screening","BU9526823AB",2020-12-15
+"BS9432826","Vancomycin","BLOQ",1,2000,2,"13-Nov-20","(parent visit)",2,"BS94328","Placebo",101110,"UNSCHED","BS9432823AB",2020-10-22
+"BP3860626","Vancomycin","8541",10,2000,2,"26-Sep-20","(parent visit)",8541,"BP38606","VE303 Low Dose",200501,"Screening","BP3860623AB",2020-10-16
+"CC2402026","Vancomycin","BLOQ",1,2000,2,"1-Apr-21","(parent visit)",2,"CC24020","VE303 High Dose",200618,"Day 7","CC2402023AB",2021-03-26
+"BR2437526","Vancomycin","BLOQ",1,2000,2,"31-Mar-21","(parent visit)",2,"BR24375","VE303 Low Dose",200305,"Day 56","BR2437523AB",2021-02-05
+"CF2718926","Vancomycin","BLOQ",1,2000,2,"12-Apr-21","(parent visit)",2,"CF27189","Placebo",104011,"UNSCHED","CF2718923AB",2021-02-16
+"BP3841226","Vancomycin","477",1,2000,2,"23-Dec-20","(parent visit)",477,"BP38412","VE303 High Dose",105805,"Day 7","BP3841223AB",2020-12-18
+"BY3567526","Vancomycin","9.32",1,2000,2,"8-Feb-21","(parent visit)",9.32,"BY35675","VE303 Low Dose",104010,"Screening","BY3567523AB",2021-02-12
+"BP3832726","Vancomycin","64.6",1,2000,2,"10-Feb-21","(parent visit)",64.6,"BP38327","VE303 Low Dose",105503,"Day 14","BP3832723AB",2021-01-28
+"BP3855907","Vancomycin","BLOQ",1,2000,2,"25-Jan-21","Predose",2,"BP38559","Placebo",200304,"Day 1","BP3855904AB",2021-01-26
+"BU9528926","Vancomycin","BLOQ",1,2000,2,"22-Oct-20","(parent visit)",2,"BU95289","Placebo",200611,"Day 14","BU9528923AB",2020-10-09
+"BS9434726","Vancomycin","BLOQ",1,2000,2,"29-Mar-21","(parent visit)",2,"BS94347","VE303 High Dose",101111,"Day 56","BS9434723AB",2021-02-02
+"BP3786526","Vancomycin","BLOQ",1,2000,2,"18-Feb-21","(parent visit)",2,"BP37865","VE303 High Dose",103106,"Day 14","BP3786523AB",2021-02-03
+"CC2401207","Vancomycin","BLOQ",1,2000,2,"17-Feb-21","Predose",2,"CC24012","VE303 High Dose",200615,"Day 1","CC2401204AB",2021-02-17
+"BT7832026","Vancomycin","516",1,2000,2,"29-Dec-20","(parent visit)",516,"BT78320","VE303 Low Dose",200614,"Day 14","BT7832023AB",2020-12-15
+"BS9434026","Vancomycin","BLOQ",1,2000,2,"3-Nov-20","(parent visit)",2,"BS94340","Placebo",101110,"Day 14","BS9434023AB",2020-10-22
+"BP3856426","Vancomycin","945",1,2000,2,"11-Feb-21","(parent visit)",945,"BP38564","VE303 Low Dose",200305,"Day 7","BP3856423AB",2021-02-05
+"CG3853126","Vancomycin","4.3",1,2000,2,"14-Feb-21","(parent visit)",4.3,"CG38531","VE303 Low Dose",200305,"UNSCHED","CG3853104AB",2021-02-05
+"BX5572826","Vancomycin","BLOQ",1,2000,2,"19-Apr-21","(parent visit)",2,"BX55728","VE303 Low Dose",105504,"Day 56","BX5572823AB",2021-02-17
+"BT7078226","Vancomycin","BLOQ",1,2000,2,"15-Dec-20","(parent visit)",2,"BT70782","VE303 Low Dose",103204,"Day 56","BT7078223AB",2020-10-09
+"BR3953026","Vancomycin","2.92",1,2000,2,"28-Mar-21","(parent visit)",2.92,"BR39530","VE303 Low Dose",200617,"Day 7","BR3953023AB",2021-03-22
+"BP3809726","Vancomycin","BLOQ",1,2000,2,"4-Dec-20","(parent visit)",2,"BP38097","VE303 High Dose",104008,"Day 56","BP3809723AB",2020-10-09
+"BS7571526","Vancomycin","BLOQ",1,2000,2,"5-Apr-21","(parent visit)",2,"BS75715","VE303 Low Dose",200617,"Day 14","BS7571523AB",2021-03-22
+"BX5572926","Vancomycin","BLOQ",1,2000,2,"24-Mar-21","(parent visit)",2,"BX55729","VE303 Low Dose",105503,"Day 56","BX5572923AB",2021-01-28
+"BP3832026","Vancomycin","4581",10,2000,2,"2-Feb-21","(parent visit)",4581,"BP38320","VE303 Low Dose",105503,"Day 7","BP3832023AB",2021-01-28
+"BV9354907","Vancomycin","6668",10,2000,2,"1-Feb-21","Predose",6668,"BV93549","VE303 High Dose",101111,"Day 1","BV9354904AB",2021-02-02
+"BU9527607","Vancomycin","8144",10,2000,2,"18-Nov-20","Predose",8144,"BU95276","VE303 Low Dose",200613,"Day 1","BU9527604AB",2020-11-18
+"BR3951026","Vancomycin","5.4",1,2000,2,"26-Sep-20","(parent visit)",5.4,"BR39510","Placebo",200611,"Screening","BR3951023AB",2020-10-09
+"BV9355526","Vancomycin","BLOQ",1,2000,2,"14-Feb-21","(parent visit)",2,"BV93555","VE303 High Dose",101111,"Day 14","BV9355523AB",2021-02-02
+"BP3743007","Vancomycin","14680",10,2000,2,"14-Oct-20","Predose",14680,"BP37430","Placebo",101110,"UNSCHED","BP3743004AB",2020-10-22
+"BP3832826","Vancomycin","BLOQ",1,2000,2,"3-Mar-21","(parent visit)",2,"BP38328","VE303 Low Dose",105504,"Day 14","BP3832823AB",2021-02-17
+"BS7568126","Vancomycin","892",1,2000,2,"26-Feb-21","(parent visit)",892,"BS75681","VE303 Low Dose",200617,"Screening","BS7568123AB",2021-03-22
+"BT7857326","Vancomycin","BLOQ",1,2000,2,"27-Feb-21","(parent visit)",2,"BT78573","VE303 High Dose",200615,"UNSCHED","BT7857323AB",2021-02-17
+"BP3859926","Vancomycin","3342",10,2000,2,"18-Jan-21","(parent visit)",3342,"BP38599","Placebo",200401,"Day 56","BP3859923AB",2020-11-24
+"BP3830526","Vancomycin","2.6",1,2000,2,"12-Aug-20","(parent visit)",2.6,"BP38305","VE303 Low Dose",105502,"UNSCHED","BP3830523AB",2020-07-24
+"BP3831407","Vancomycin","8743",10,2000,2,"28-Jan-21","Predose",8743,"BP38314","VE303 Low Dose",105503,"Day 1","BP3831404AB",2021-01-28
+"BV1613326","Vancomycin","BLOQ",1,2000,2,"1-Mar-21","(parent visit)",2,"BV16133","Placebo",104011,"Day 14","BV1613323AB",2021-02-16
+"BU9529926","Vancomycin","BLOQ",1,2000,2,"10-Jan-21","(parent visit)",2,"BU95299","VE303 Low Dose",200613,"Day 56","BU9529923AB",2020-11-18
+"BP3761526","Vancomycin","5502",10,2000,2,"7-Oct-20","(parent visit)",5502,"BP37615","VE303 High Dose",104007,"Day 7","BP3761523AB",2020-10-01
+"BP3761626","Vancomycin","580",1,2000,2,"7-Oct-20","(parent visit)",580,"BP37616","Placebo",104006,"Day 7","BP3761623AB",2020-10-01
+"BP3857726","Vancomycin","9.19",1,2000,2,"5-Nov-20","(parent visit)",9.19,"BP38577","Placebo",200401,"Screening","BP3857723AB",2020-11-24
+"BU9528126","Vancomycin","472",1,2000,2,"15-Oct-20","(parent visit)",472,"BU95281","Placebo",200611,"Day 7","BU9528124AB",2020-10-09
+"BP3861907","Vancomycin","15930",10,2000,2,"16-Oct-20","Predose",15930,"BP38619","VE303 Low Dose",200501,"Day 1","BP3861904AB",2020-10-16
+"BT7830726","Vancomycin","45.5",1,2000,2,"14-Jul-20","(parent visit)",45.5,"BT78307",NA,NA,NA,NA,NA
+"BP3811326","Vancomycin","3426",10,2000,2,"11-Jan-21","(parent visit)",3426,"BP38113","VE303 Low Dose",104009,"Day 14","BP3811323AB",2020-12-28
+"BP3854626","Vancomycin","362",1,2000,2,"14-Jan-21","(parent visit)",362,"BP38546","Placebo",200304,"Screening","BP3854623AB",2021-01-26
+"BP3756626","Vancomycin","BLOQ",1,2000,2,"11-Jan-21","(parent visit)",2,"BP37566","VE303 High Dose",103306,"Day 14","BP3756623AB",2020-12-29
+"BT7832826","Vancomycin","BLOQ",1,2000,2,"13-Jan-21","(parent visit)",2,"BT78328","VE303 High Dose",200612,"Day 56","BT7832823AB",2020-11-19
+"BV1613426","Vancomycin","BLOQ",1,2000,2,"26-Oct-20","(parent visit)",2,"BV16134","VE303 High Dose",104008,"Day 14","BV1613423AB",2020-10-09
+"BP3753726","Vancomycin","BLOQ",1,2000,2,"22-Oct-20","(parent visit)",2,"BP37537","VE303 Low Dose",103204,"Day 14","BP3753723AB",2020-10-09
+"BS7568226","Vancomycin","BLOQ",1,2000,2,"4-Nov-20","(parent visit)",2,"BS75682","VE303 Low Dose",200613,"Screening","BS7568223AB",2020-11-18
+"BU9526626","Vancomycin","10570",10,2000,2,"6-Nov-20","(parent visit)",10570,"BU95266","VE303 High Dose",200612,"Screening","BU9526623AB",2020-11-19
+"BP3762126","Vancomycin","BLOQ",1,2000,2,"25-Feb-21","(parent visit)",2,"BP37621","VE303 Low Dose",104010,"Day 14","BP3762123AB",2021-02-12
+"CI1249126","Vancomycin","BLOQ",1,2000,2,"22-Apr-21","(parent visit)",2,"CI12491","VE303 High Dose",200616,"Day 56","CI1249123AB",2021-02-26
+"BP7181026","Vancomycin","BLOQ",1,2000,2,"6-Apr-21","(parent visit)",2,"BP71810","VE303 High Dose",103106,"Day 56","BP7181023AB",2021-02-03
+"BH3875908","Vancomycin","BLOQ",1,2000,2,"22-Nov-19","Predose",2,"BH38759","VE303 High Dose",100701,"Day 1","BH3875904AB",2019-11-22
+"BH3876027","Vancomycin","BLOQ",1,2000,2,"29-Nov-19","(parent visit)",2,"BH38760","VE303 High Dose",100701,"Day 7","BH3876023AB",2019-11-22
+"BH8972909","Vancomycin","BLOQ",1,2000,2,"5-Aug-19","Predose",2,"BH89729","Placebo",102602,"Day 1","BH8972904AB",2019-08-05
+"BH8973027","Vancomycin","BLOQ",1,2000,2,"12-Aug-19","(parent visit)",2,"BH89730","Placebo",102602,"Day 7","BH8973023AB",2019-08-05
+"BI2430608","Vancomycin","BLOQ",1,2000,2,"19-Jul-19","Predose",2,"BI24306","VE303 Low Dose",103301,"Day 1","BI2430604AB",2019-07-19
+"BI2430727","Vancomycin","BLOQ",1,2000,2,"25-Jul-19","(parent visit)",2,"BI24307","VE303 Low Dose",103301,"Day 7","BI2430723AB",2019-07-19
+"BJ8848308","Vancomycin","BLOQ",1,2000,2,"6-Sep-19","Predose",2,"BJ88483","VE303 High Dose",103302,"Day 1","BJ8848304AB",2019-09-06
+"BJ8848627","Vancomycin","BLOQ",1,2000,2,"11-Sep-19","(parent visit)",2,"BJ88486","VE303 High Dose",103302,"Day 7","BJ8848623AB",2019-09-06
+"BP3841826","Vancomycin","BLOQ",1,2000,2,"4-Jan-21",NA,2,"BP38418",NA,105005,"Day 14","BP3841823AB",NA
+"CJ6950126","Vancomycin","BLOQ",1,2000,2,"20-Jul-21",NA,2,"CJ69501","VE303 Low Dose",104010,"UNSCHED","CJ6950123AB",2021-02-12

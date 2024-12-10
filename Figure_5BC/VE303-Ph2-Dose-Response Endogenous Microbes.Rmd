@@ -1,0 +1,1334 @@
+---
+title: "VE303-Ph2-AnalysisWorkflow to run LME models on VE303 phase 2 data - Final Data"
+author: "Rajita M"
+date: "2024-08-26"
+output: html_document
+---
+
+## Workflow to assess VE303-002 data for 79 patient IA
+## Note packages and source files here
+```{r, warning=FALSE, include=FALSE}
+
+library(plyr)
+library(openxlsx)
+library(RColorBrewer)
+library(tidyverse)
+library(vegan)
+library(here)
+library(ggrepel)
+library(ggpubr)
+library(scales)
+library(Maaslin2)
+library(ZIBR)
+library(nlme)
+library(lme4)
+library(dplyr)
+library(rlang)
+library(writexl) 
+library(patchwork)
+library(Rmisc)
+library(ggbeeswarm)
+library(compositions)
+
+source("colors.R") #source colors
+
+```
+
+## Print R version and working directory.
+```{r }
+
+#sessionInfo()
+here()
+
+```
+
+## Set up directory structure for output - this will create a new directory with the current date to save results to
+```{r}
+results <- paste(Sys.Date(), "Endogenous results dose-response", sep = "_")
+dir.create(here(results), showWarnings = TRUE)
+
+
+# Function Will be needed for survival analysis ##
+show.me <- function(x){
+  if(as.data.frame(x[, c("rec.diagnosis")])[,1][1] == "Bad"){x$rec.day.in.treatment.surv <- x$rec.day.in.treatment.surv}
+  if(as.data.frame(x[, c("rec.diagnosis")])[,1][1] == "Good"){x$rec.day.in.treatment.surv <- 168 }
+  return(x)}
+
+```
+
+## Load required files
+```{r, include=FALSE}
+
+## Import cleaned metadata Based on merged SPR
+#dnameta = read_csv(here("Input files/2021-10-18 VE303_dna_metadata_80IA_mult.csv"))
+dnameta = read_csv(here("Input files/2022-03-08 VE303_dna_metadata_80IA_mult.csv"))
+
+#### Import updated  marker panel with targeted relative abundance estimation : TO BE COMBINED with metadata file
+#ve303 = read_csv(here("Input files/2021-10-06 VE303_Ph2_Extended_Marker_Data.csv"))
+ve303 = read_csv(here("Input files/2022-01-11 VE303_Ph2_Extended_Marker_Data.csv"))
+
+## Import cleaned recurrence metadata
+## IA 3 recurrence
+#rec = read_csv(here("Input files/2021-10-05 CDI_Recurrences_IA2_treatment_assignment-OUT.csv"))
+
+## Final recurrence list with subject 103106 as non-recurrent
+rec = read_csv(here("Input files/2022-03-09 CDI_Recurrences_IA2_treatment_assignment-OUT.csv"))
+
+## Import cleaned conmeds metadata
+conmed = read_csv(here("Input files/2021-10-05 VE303-002_ConMeds_treatment_assignment-OUT.csv"))
+
+
+## Import primary vs secondary CDI population metadata
+study_pops = read_csv(here("Input files/2022-03-16 VE303 prior CDI summary.csv")) %>%
+  rename(Subject.Number = Subject)
+
+```
+
+## Merge Extended marker panel with metadata to create VE303 subject level data file
+## Merge VE303 subject level data and ConMed data to establish time of abx dosing and interaction with recurrence
+## Merge VE303 subject level data and recurrence data 
+
+```{r} 
+
+
+source("VE303.data.import.merge.R")
+
+```
+
+ 
+ 
+ 
+
+ 
+
+```{r}
+
+ve303.dnameta_preabx <- ve303.dnameta %>% filter(collect.pre.post.abx == "Pre.abx")  
+ve303.dnameta_allabx <- ve303.dnameta 
+
+taxplot <- "Pre Abx"
+
+if(taxplot == "Pre Abx"){
+  #Add frequency variable for all rows - this gives every detection/non-det result a value of 1
+  ve303.dnameta_plot <- data.frame(ve303.dnameta_preabx, freq = 1)
+}
+
+if(taxplot == "All Abx"){
+  #Add frequency variable for all rows - this gives every detection/non-det result a value of 1
+  ve303.dnameta_plot <- data.frame(ve303.dnameta_allabx, freq = 1)
+}
+ 
+
+
+##To plot zeroes
+ve303.dnameta_plot.alt = ve303.dnameta_plot %>%
+  mutate(est_relative_abundance_panel_alt = if_else(detection_status != "Detected", 0, est_relative_abundance_panel)) %>%
+  group_by(Subject.Number, Visit.Name ) %>%
+  mutate(.,est_relative_abundance_panel_alt_sum = sum(est_relative_abundance_panel_alt)) %>%
+  ungroup()
+
+
+```
+ 
+
+ 
+## Plot VE303 detection and calculate summary stats  - All DETECTED events Pre-Abx OR Pre- and Post-Abx  depending on selection in script
+#Add frequency variable for all rows - this gives every detection/non-det result a value of 1
+
+```{r, include=FALSE}
+source("VE303.tables.summary.stats.R")
+```
+
+
+
+### VE303 Abundance - only detected strains
+```{r}
+
+
+##To plot zeroes
+ve303.dnameta.det.alt = ve303.dnameta %>%
+  mutate(est_relative_abundance_panel_alt = if_else(detection_status != "Detected", 0, est_relative_abundance_panel)) %>%
+  group_by(Subject.Number, Visit.Name) %>%
+  mutate(.,est_relative_abundance_panel_alt_sum = sum(est_relative_abundance_panel_alt)) %>%
+  ungroup()
+
+
+# Filter the data frame to only include VE303 Strain Detected by the marker panel
+ve303.dnameta.det <- ve303.dnameta %>% 
+  filter(detection_status == "Detected")
+
+# Filter the data frame to include VE303 Strain Detected AND Insufficient data by the marker panel
+
+ve303.dnameta.det_ID <- ve303.dnameta %>% 
+  filter(detection_status %in% c("Detected", "Insufficient data"))
+
+
+ve303.dnameta.det.tp <- ve303.dnameta.det %>% 
+  arrange(Subject.Number, Visit.Name.Norm) %>% 
+  group_by(Visit.Name.Norm, organism) %>%      # Select a single representative sample from each Subject for each Visit.Name.Norm & result in the same df as above
+  distinct(Subject.Number, .keep_all = TRUE)
+ 
+
+```
+
+
+```{r, include=FALSE}
+source("VE303.abundance.summary.wrangling.R")
+``` 
+   
+
+```{r}
+ve303.dnameta.det.alt$collect.pre.post.rec_joined <- as.factor(plyr::mapvalues(ve303.dnameta.det.alt$collect.pre.post.rec, from= c("No.rec"), to=c("Pre.rec")))
+
+ve303.abund.subj.total.time.det.alt$collect.pre.post.rec_joined <- as.factor(plyr::mapvalues(ve303.abund.subj.total.time.det.alt$collect.pre.post.rec, from= c("No.rec"), to=c("Pre.rec")))
+
+```
+
+ 
+              
+## Import wrangled and cleaned One Codex Results All - Tidy format and clean format
+## One combined dataframe, and individual dataframes at each taxonomic level from species to phylum
+## Data generated for: abun_choice <- "abun_w_children" 
+# Thresholds for prevalence and abundance - species that make these cutoffs are stored in "filtspecies", "filtgenus" etc.
+# | threshabun <- 0.01 | threshprev <- 0.5 | threshmean <- 0.001
+# taxonomy_system <- "NCBI"
+
+
+```{r, include=FALSE}
+
+#Function using rmisc package to compute with-subject adjusted abundances
+
+compute_normalize <- function(data){ bind_rows(lapply(data, function(X){
+  Y <- normDataWithin(data = X, idvar = "Subject.Number" , measurevar =  "log_rel_abund")
+  return(Y)})) }
+
+###########################################
+
+oc.abund.meta = read_csv(here("Input files/2022-06-27_AllTax Dataframe_.csv"), col_names = TRUE, na = c("", "NA"))
+
+
+oc.sp.long.rel.meta = read_csv(here("Input files/2022-06-27_species_NCBI_Dataframe_.csv"), col_names = TRUE, na = c("", "NA")) %>% mutate(log_rel_abund = log10(0.0001 + (100*rel_abund)))
+f1 = read_csv(here("Input files/2022-06-27_species_NCBI_filt_taxa_.csv"), col_names = TRUE, na = c("", "NA"))
+
+oc.sp.long.rel.meta <- compute_normalize(data = split(oc.sp.long.rel.meta,
+                               oc.sp.long.rel.meta$Species.corrected))
+
+filtspecies = f1$Taxa
+## The array has the true VE303 species names. These are background relatives being detected at a low level
+
+filtspecies <- filtspecies[!filtspecies %in% c("VE303.01","VE303.02","VE303.03","VE303.04","VE303.05",
+                                "VE303.06","VE303.07", "VE303.08", "Clostridioides.difficile")]
+
+
+oc.sp.long.rel.meta.ve303 <- oc.sp.long.rel.meta %>% 
+        filter(grepl("VE303", Species.corrected)) 
+
+
+oc.genus.long.rel.meta = read_csv(here("Input files/2022-06-27_genus_NCBI_Dataframe_.csv"), col_names = TRUE, na = c("", "NA")) %>% mutate(log_rel_abund = log10(0.0001 + (100*rel_abund)))
+f1 = read_csv(here("Input files/2022-06-27_genus_NCBI_filt_taxa_.csv"), col_names = TRUE, na = c("", "NA"))
+filtgenus = f1$Taxa
+oc.genus.long.rel.meta <- compute_normalize(data = split(oc.genus.long.rel.meta,
+                               oc.genus.long.rel.meta$genus_name))
+
+
+oc.family.long.rel.meta = read_csv(here("Input files/2022-06-27_family_NCBI_Dataframe_.csv"), col_names = TRUE, na = c("", "NA")) %>% mutate(log_rel_abund = log10(0.0001 + (100*rel_abund)))
+f1  = read_csv(here("Input files/2022-06-27_family_NCBI_filt_taxa_.csv"), col_names = TRUE, na = c("", "NA"))
+filtfamily = f1$Taxa
+oc.family.long.rel.meta <- compute_normalize(data = split(oc.family.long.rel.meta,
+                               oc.family.long.rel.meta$family_name))
+
+oc.order.long.rel.meta = read_csv(here("Input files/2022-06-27_order_NCBI_Dataframe_.csv"), col_names = TRUE, na = c("", "NA")) %>% mutate(log_rel_abund = log10(0.0001 + (100*rel_abund)))
+f1 = read_csv(here("Input files/2022-06-27_order_NCBI_filt_taxa_.csv"), col_names = TRUE, na = c("", "NA"))
+filtorder = f1$Taxa
+oc.order.long.rel.meta <- compute_normalize(data = split(oc.order.long.rel.meta,
+                               oc.order.long.rel.meta$order_name))
+
+oc.cl.long.rel.meta = read_csv(here("Input files/2022-06-27_class_NCBI_Dataframe_.csv"), col_names = TRUE, na = c("", "NA")) %>% mutate(log_rel_abund = log10(0.0001 + (100*rel_abund)))
+f1 = read_csv(here("Input files/2022-06-27_class_NCBI_filt_taxa_.csv"), col_names = TRUE, na = c("", "NA"))
+filtclass = f1$Taxa
+oc.cl.long.rel.meta <- compute_normalize(data = split(oc.cl.long.rel.meta,
+                               oc.cl.long.rel.meta$class_name))
+
+
+oc.ph.long.rel.meta = read_csv(here("Input files/2022-06-27_phylum_NCBI_Dataframe_.csv"), col_names = TRUE, na = c("", "NA")) %>% mutate(log_rel_abund = log10(0.0001 + (100*rel_abund)))
+f1 = read_csv(here("Input files/2022-06-27_phylum_NCBI_filt_taxa_.csv"), col_names = TRUE, na = c("", "NA"))
+filtphylum = f1$Taxa
+oc.ph.long.rel.meta <- compute_normalize(data = split(oc.ph.long.rel.meta,
+                               oc.ph.long.rel.meta$phylum_name))
+
+
+###################################################
+ 
+
+```
+ 
+ 
+```{r}
+
+oc.sp.long.rel.meta$Subject.Number %>% unique() %>% length()
+print(paste0("N species included in analysis = ", length(unique(filtspecies))))
+
+ 
+
+## Strain 5 is Blautia.marasmi and strain 8 is Flavonifracter plautii  (by NCBI) #
+species_relatives_GTDB <- c("Clostridium_M.bolteae", "Anaerotruncus.colihominis", "Sellimonas.intestinalis",
+                       "Clostridium_Q.symbiosum", "Blautia.sp001304935", "Dorea.longicatena",
+                       "Absiella.innocuum", "Flavonifractor.sp000508885")
+
+species_relatives_NCBI <- c("Clostridium.bolteae", "Anaerotruncus.colihominis","Sellimonas.intestinalis",
+                       "Clostridium.symbiosum", "Blautia.marasmi", "Dorea.longicatena",
+                       "Clostridium.innocuum", "Flavonifractor.plautii")
+ 
+species_relatives <- species_relatives_NCBI
+
+
+```
+  
+ 
+  
+
+```{r}
+#OC PHYLUM DATAFRAME
+oc.ph.long.rel.meta
+ 
+#OC SPECIES DATAFRAME
+oc.sp.long.rel.meta 
+
+#OC VE303 DATAFRAME
+oc.sp.long.rel.meta.ve303
+
+#OC CLASS DATAFRAME
+oc.cl.long.rel.meta  
+
+
+```
+  
+
+### FITTING REGULAR LME MAASLIN TO INCLUDE SUBJECTS WITH MISSING SAMPLES
+
+## Data prep for Maaslin2
+
+```{r}
+
+
+analysis_type <- 'OC_VE303'
+tax_level <- 'species'
+
+source("Prepdata_Maaslin_Dose Response Endogenous.R")
+
+head(d11.total)
+
+
+print("Set reference level to be VE303 Dosed Good in the rec.TRT.combined group")
+d11.total$rec.TRT.combined <- factor(d11.total$rec.TRT.combined,levels = c( "VE303 Dosed Good","VE303 Dosed Bad", "Placebo Good","Placebo Bad"))
+
+VE303_sp.all <- d11.total
+VE303_sp.all$rec.TRT %>% unique()
+
+
+##If analyzing fewer species to control false discovery rate--> use topspec instead of filtspecies
+## Compute within subject means for each species, then across subject means, and taking the top quartile = 122 species 
+## which includes many relvant VE303 species
+
+filt1 <- oc.sp.long.rel.meta  %>% filter(Species.corrected %in% filtspecies)
+means_species <- filt1 %>% group_by(Species.corrected, Subject.Number) %>%
+  mutate(within_subj_mean = mean(rel_abund))  %>%
+   ungroup() %>%
+   distinct(Species.corrected,Subject.Number, .keep_all = TRUE) %>%
+   group_by(Species.corrected) %>%
+   mutate(across_subjects_mean = mean(within_subj_mean)) %>%
+   ungroup() %>%
+   distinct(Species.corrected, .keep_all = TRUE) %>%
+   select(Species.corrected, across_subjects_mean) %>%
+   arrange(desc(across_subjects_mean))  
+
+
+mm<- means_species %>% filter(across_subjects_mean > quantile(means_species$across_subjects_mean)[4])  
+topspec <- mm$Species.corrected
+ 
+
+```
+
+ 
+ 
+
+
+## Create dataframe with VE303 abundance values with the marker panel, to be joined with the Maaslin covariates array for the endogenous species vs individual VE303 analyses
+```{r}
+
+ve303_panel_maaslin <- ve303.dnameta.det.alt %>% 
+  mutate(organism = str_replace(organism, "VE303-", "MP.VE303.")) %>%
+  select(organism, Sample.ID, est_relative_abundance_panel_alt ) %>%
+  pivot_wider(names_from = organism, values_from = est_relative_abundance_panel_alt)
+ 
+```
+
+
+```{r}
+
+abundance <- "relative"
+
+if(abundance == "relative"){
+  print("Analyzing relative abundance")
+
+VE303_sp.all_Maaslin <- VE303_sp.all %>% 
+  select(Sample.ID,Subject.Number, Timepoint_adj ,rec.diagnosis,rec.diagnosis.Wk8,rec.TRT, rec.TRT.combined ,collect.pre.post.rec,Seq.batch,Batch,  Visit.Name,  organism, TRT.norm, rel_abund, Abx.group, Abx.group_joined ) %>%
+  spread(organism, rel_abund, fill=0) %>% # This fills in zeros for all events not detected - needed to calc mean
+  left_join(., distinct(ve303.dnameta[c("Sample.ID","shannon_diversity")]), by = "Sample.ID") %>%
+  left_join(., distinct(ve303.dnameta.det.alt[c("Sample.ID","est_relative_abundance_panel_alt_sum")]), by = "Sample.ID") %>% 
+  mutate(VE303 = est_relative_abundance_panel_alt_sum ) %>%
+  filter(Timepoint_adj < 65)
+
+VE303_sp.all_Maaslin <- distinct(VE303_sp.all_Maaslin, Sample.ID, .keep_all = TRUE) %>% left_join(ve303_panel_maaslin, by = "Sample.ID")
+}
+
+
+if(abundance == "absolute"){
+  print("Analyzing absolute abundance")
+
+VE303_sp.all_Maaslin <- VE303_sp.all %>% 
+  select(Sample.ID,Subject.Number, Timepoint_adj ,rec.diagnosis,rec.diagnosis.Wk8,rec.TRT, rec.TRT.combined, collect.pre.post.rec,Seq.batch,Batch,  Visit.Name,  organism, TRT.norm,  absolute_abund, Abx.group, Abx.group_joined) %>%
+  spread(organism, absolute_abund, fill=0) %>% # This fills in zeros for all events not detected - needed to calc mean
+  left_join(., distinct(ve303.dnameta[c("Sample.ID","shannon_diversity")]), by = "Sample.ID") %>%
+    left_join(., distinct(ve303.dnameta.det.alt[c("Sample.ID","est_relative_abundance_panel_alt_sum")]), by = "Sample.ID") %>%
+  filter(Timepoint_adj < 65)
+VE303_sp.all_Maaslin <- distinct(VE303_sp.all_Maaslin, Sample.ID, .keep_all = TRUE)}
+ 
+
+```
+## Adding ve303 names from marker panel dataframe for choice to analyze in full LME models of species vs recurrence, treatment etc.
+```{r}
+
+ve303_mgsnames <- filtspecies[grep("..VE303", filtspecies)]
+ve303_mpnames <- colnames(ve303_panel_maaslin)[2:9]
+filtspecies_panel <- c(filtspecies, ve303_mpnames)
+filtspecies_panel <- filtspecies_panel[!filtspecies_panel %in% ve303_mgsnames ]
+   
+
+```
+
+
+# CHOOSE WHETHER TO DO TREATMENT COMPARISON FOR ALL LEVELS OR JUST WITH HD LD. AND WHETHER TO EXCLUDE SAMPLES POST-RECURRENCE.
+```{r}
+
+treats <- "Dosed and Placebo"
+#treats <- "Dosed"
+#treats <- "Placebo"
+
+colpick.all <- c("Subject.Number","Timepoint_adj","rec.diagnosis","rec.diagnosis.Wk8", "rec.TRT", "rec.TRT.combined","Batch" , "Seq.batch","Visit.Name", "TRT.norm", "collect.pre.post.rec", "Abx.group",
+                 "Abx.group_joined")
+
+VE303_sp.all_Maaslin <- VE303_sp.all_Maaslin %>% filter(Timepoint_adj <= 60 & Timepoint_adj > 0)
+
+# ARRAY FOR DOSED COMPARISON HD VS LD ONLY, ALL TIMEPOINTS #
+VE303_sp.all_Maaslin_filtered <- VE303_sp.all_Maaslin %>% filter(TRT.norm != "Placebo")
+
+
+# ARRAY FOR DOSED COMPARISON Placebo ONLY, ALL TIMEPOINTS #
+VE303_sp.all_Maaslin_filtered_placebo <- VE303_sp.all_Maaslin %>% filter(TRT.norm == "Placebo")
+
+
+source("PrepModels_Maaslin_Dose Response Endogenous.R")
+
+
+
+```
+
+```{r}
+
+relatives_names_plotting_1 <- c("Clostridium_M.bolteae",  "Anaerotruncus.colihominis", 
+                                "Sellimonas.intestinalis","Clostridium_Q.symbiosum",
+                                "Blautia.sp001304935",
+                                "Dorea.longicatena", "Absiella.innocuum",
+                                "Flavonifractor.sp000508885","Flavonifractor.plautii")
+
+relatives_names_plotting <- c("Clostridium_M.bolteae",  "Anaerotruncus.colihominis", 
+                              "Sellimonas.intestinalis","Clostridium_Q.symbiosum",  "Blautia.sp..VE303.05", "Dorea.sp..VE303.06", 
+                              "Absiella.sp..VE303.07", "Flavonifractor.sp..VE303.08")
+
+
+n <- 8
+gg<- relatives_names_plotting[n]
+
+g <- filter(oc.sp.long.rel.meta, grepl(gg,Species.corrected))
+g1 <- g %>% filter(Day.in.treatment <=30 & Day.in.treatment >0)
+
+vvtest <- g1 %>% 
+  select(Subject.Number, Species.corrected, TRT.norm, Visit.Name.Norm,rec.diagnosis.Wk8, rel_abund,MGS.Sample.ID ) %>%
+  group_by(Subject.Number, TRT.norm, Visit.Name.Norm) %>% 
+  spread(Species.corrected, rel_abund, fill=0) %>% # This fills in zeros for all events not detected - needed to calc mean
+  gather(Species.corrected, rel_abund, 6: ncol(.)) %>% 
+  group_by(Subject.Number, Species.corrected, TRT.norm) %>% 
+  mutate(subject_mean_time = mean(rel_abund)) %>%
+  ungroup() %>% 
+  group_by( Species.corrected,TRT.norm) %>% 
+  mutate(cohort_mean_time  = mean(subject_mean_time)) %>%
+  ungroup() %>% 
+  distinct(left_join(., dnameta, by = "MGS.Sample.ID")) 
+   
+vvtest <- vvtest %>% 
+ rename_at(vars(ends_with(".x")),  ~str_replace(., "\\..$","") ) %>% 
+ select_at(vars(-ends_with(".y"))) %>%
+ distinct(TRT.norm, Species.corrected, .keep_all = TRUE)
+ 
+
+printcols <- c("Species.corrected","cohort_mean_time","TRT.norm")
+
+newdata <- vvtest[order(-vvtest$cohort_mean_time),]
+
+
+```
+## Some label testing before putting into the Maaslin loop
+```{r}
+
+models[1]
+model_description
+
+VE303_sp.all_Maaslin_test <- Arrays[[1]]
+ 
+ 
+ve303_colnames <- ve303_mpnames
+colpick.all.303 <- c(colpick.all, "est_relative_abundance_panel_alt_sum", ve303_colnames)
+
+ve303_metadata <- VE303_sp.all_Maaslin_test[colpick.all.303]
+ve303_metadata$VE303 <- ve303_metadata$est_relative_abundance_panel_alt_sum
+
+ve303_colnames.all <- c(ve303_colnames, "VE303")
+ 
+   
+
+```
+## Choose "dosing" to be HD, LD, Placebo or "combined", choose transformation to be "Log" or "AST"
+```{r}
+
+#dosing <- "HD"
+dosing <- "combined"
+
+norm_opts <- c("NONE", "NONE", "CLR")
+trans_opts <- c("AST", "LOG", "NONE")
+
+transcount <- 2 # pick 1 if AST, 2 if Log
+
+norms <- norm_opts[transcount]
+trans <- trans_opts[transcount]
+ 
+trans
+norms
+
+```
+
+## Choose whether to run Maaslin; if "Yes" then specified models will run on all taxonomic levels; if "No" then import pre-run model results 
+## include_fewer_species == "VE303_MP" will run the analysis with individual VE303 detection/abundance using the marker panel
+## include_fewer_species == "VE303_MGS" will run the analysis with individual VE303 detection/abundance using the OC metagenomics file
+
+```{r}
+
+run_maaslin <- "No"
+
+include_fewer_species <- "No"
+if(include_fewer_species == "Yes"){input_depvar <- topspec}
+if(include_fewer_species == "No"){input_depvar <- input_depvar}
+if(include_fewer_species == "VE303_MP" & tax_level == "species"){input_depvar <- filtspecies_panel}
+
+model_description[4]
+vevec <- 9
+ 
+```
+ 
+## Running Maaslin to identify associations between endogenous microbes and individual VE303 species
+```{r }
+
+if(run_maaslin == "Yes"){ 
+print("run MaasLin on 6-7 defined models")
+
+countvec <-  c(4) #c(1,2,3,4,5,6)
+ve303vec <- c(1,2) #),3,4,5,6,7,8)
+stats_VE303 <- list()
+
+for (cvec in countvec) {  
+  model_type <- model_description[cvec]
+  VE303_sp_div <- c(input_depvar, "shannon_diversity")
+  ve303_organism <- VE303_sp.all_Maaslin_test[input_depvar]
+  pseudo <- 0.000001 # changed pseudocount from 0.0001 on May 30 2023
+  if(trans == "LOG"){ ve303_organism <- ve303_organism + pseudo}
+  ve303_organism$shannon_diversity <- VE303_sp.all_Maaslin_test$shannon_diversity
+  
+  for (vevec in ve303vec) {  
+    #ve303_organism$VE303_total <- rowSums(ve303_organism)
+    VE303_sp.all_Maaslin_test[[ve303_colnames.all[vevec]]] <-  
+      log10(pseudo + VE303_sp.all_Maaslin_test[[ ve303_colnames.all[vevec] ]])
+    colpick.all.303 <- c(colpick.all, ve303_colnames.all[vevec] )
+    ve303_metadata <- VE303_sp.all_Maaslin_test[colpick.all.303]
+
+    if(dosing %in% c("combined")){
+      VE303_sp.all_Maaslin_test <- Arrays[[cvec]]
+  #    fixed_model <-   c( "Batch", "rec.TRT.combined","TRT.norm", ve303_colnames[vevec])
+      fixed_model <-   c(  "Abx.group_joined" , "rec.TRT.combined",ve303_colnames.all[vevec])
+  #    fixed_model <-   c(  "Abx.group_joined" ,"Visit.Name" ,"rec.TRT.combined",ve303_colnames[vevec])
+  #    fixed_model <-   c( "Batch", "Abx.group_joined" ,"rec.TRT.combined",ve303_colnames[vevec])
+  #    fixed_model <-   c( "Batch", "Abx.group_joined" ,"rec.TRT.combined","TRT.norm", ve303_colnames[vevec])
+      ref_level = c("rec.TRT.combined,VE303 Dosed Bad","Visit.Name,Day 1" ,"TRT.norm,Placebo","Batch,1")}
+  
+    ### FOR ASSOCIATIONS AT CLASS LEVEL WITH VE303 ---- USE NORM = TSS and TRANSFORM = AST WITH RELATIVE ABUNDANCE
+   
+      invisible(capture.output(fit_data2 = Maaslin2(
+        input_data = ve303_organism, 
+        input_metadata = ve303_metadata, 
+        normalization = norms,
+        transform = trans,
+        analysis_method = "LM",
+    
+        ### FOR SPECIES LEVEL
+        output = paste(Sys.Date(), tax_level, treats, dosing,trans, norms, ve303_colnames.all[vevec], ... = "rec_Wk8",model_type, sep = " "), 
+        fixed_effects = fixed_model,
+        reference = ref_level,
+        #fixed_effects = c("TRT.norm", "rec.TRT.combined", "Batch", "VE303" ),
+        random_effects = c("Subject.Number")) ) )    }
+  
+    if(cvec == 4){
+      modeltype <- model_description[cvec]
+      model_type <- modeltype
+      output = paste(Sys.Date(), tax_level, treats, dosing, trans,norms, ve303_colnames.all[vevec],"rec_Wk8",model_type, sep = " ")
+      output_save = paste( tax_level, treats, dosing, trans,norms, ve303_colnames.all[vevec],"rec_Wk8",model_type, sep = " ")
+      model_result = read_tsv(here(paste(output, "all_results.tsv", sep = "/")))
+      models_list <- list()
+      for (x1 in (model_result$metadata %>% unique())) {
+        model_result1 <- model_result %>%   filter(metadata == x1)
+        model_result2 <- model_result1[
+        with(model_result1, order(value, pval)),] %>%
+        filter(pval < 1.0)
+        models_list <-  append(models_list, list(model_result2))    }
+      models_1 <- lapply(models_list, function(x) cbind(" "=rownames(x), x))
+      ## Writes to multi sheet excel file ###
+      writexl::write_xlsx(models_1, here(output, "all_results.xlsx") )
+      pm <- models_1[[1]] %>% filter(qval < 0.05 )       }
+      stats_VE303 <- append(stats_VE303, list(pm) ) }
+    print("Done")
+}
+
+
+
+
+```
+
+ 
+
+## Running Maaslin to identify associations between endogenous microbes and total sum VE303
+
+```{r, include=FALSE}
+
+if(run_maaslin == "Yes"){ 
+print("run MaasLin on 6-7 defined models")
+
+countvec <- c(1,2,3,4,5,6)
+
+for (cvec in countvec) {  
+  if(dosing %in% c("HD")){
+    VE303_sp.all_Maaslin_test <-  (Arrays[[cvec]])  %>% filter(TRT.norm == "VE303 High Dose")
+#    fixed_model <-   c( "Batch"  ,"rec.diagnosis.Wk8")  
+    fixed_model <-   c( "Abx.group_joined" ,"rec.diagnosis.Wk8", "Visit.Name")  
+    ref_level = c("rec.diagnosis.Wk8,Bad","Visit.Name,Day 1" ,"Batch,1")}
+  if(dosing %in% c("LD")){
+    VE303_sp.all_Maaslin_test <- Arrays[[cvec]]  %>% filter(TRT.norm == "VE303 Low Dose")
+     fixed_model <-   c( "Batch","Abx.group_joined" , "rec.diagnosis.Wk8")
+ #    fixed_model <-   c( "Batch",  "rec.diagnosis.Wk8")
+     ref_level = c("rec.diagnosis.Wk8,Bad","Batch,1")}
+  if(dosing %in% c("Placebo")){
+    VE303_sp.all_Maaslin_test <- Arrays[[cvec]]  %>% filter(TRT.norm == "Placebo")
+#     fixed_model <-   c( "Batch",  "rec.diagnosis.Wk8")
+     fixed_model <-   c( "Batch", "Abx.group_joined" ,"rec.diagnosis.Wk8")
+     ref_level = c("rec.diagnosis.Wk8,Bad","Batch,1")}
+  if(dosing %in% c("combined")){
+    VE303_sp.all_Maaslin_test <- Arrays[[cvec]]
+    fixed_model <-   c(  "Abx.group_joined" , "rec.TRT.combined","VE303")
+#    fixed_model <-   c(  "Abx.group_joined" ,"Visit.Name" ,"rec.TRT.combined","VE303")
+#    fixed_model <-   c( "Batch", "Abx.group_joined" ,"rec.TRT.combined","VE303")
+#    fixed_model <-   c( "Batch", "Abx.group_joined" ,"rec.TRT.combined","TRT.norm", "VE303")
+    ref_level = c("rec.TRT.combined,VE303 Dosed Bad","Visit.Name,Day 1" ,"TRT.norm,Placebo","Batch,1")}
+  
+  model_type <- model_description[cvec]
+  
+  VE303_sp_div <- c(input_depvar, "shannon_diversity")
+  ve303_organism <- VE303_sp.all_Maaslin_test[input_depvar]
+  pseudo <- 0.000001 # changed pseudocount from 0.0001 on May 30 2023
+  if(trans == "LOG"){ ve303_organism <- ve303_organism + pseudo}
+  #ve303_organism$VE303_total <- rowSums(ve303_organism)
+  
+  ve303_organism$shannon_diversity <- VE303_sp.all_Maaslin_test$shannon_diversity
+  #VE303_sp.all_Maaslin_test$VE303 <- (VE303_sp.all_Maaslin_test$est_relative_abundance_panel_alt_sum)
+
+  VE303_sp.all_Maaslin_test$VE303 <-  log10( pseudo+VE303_sp.all_Maaslin_test$est_relative_abundance_panel_alt_sum)
+  colpick.all.303 <- c(colpick.all, "VE303" )
+
+  ve303_metadata <- VE303_sp.all_Maaslin_test[colpick.all.303]
+  ### FOR ASSOCIATIONS AT CLASS LEVEL WITH VE303 ---- USE NORM = TSS and TRANSFORM = AST IWTH RELATIVE ABUNDANCE
+   
+  invisible(capture.output(fit_data2 = Maaslin2(
+    input_data = ve303_organism, 
+    input_metadata = ve303_metadata, 
+    normalization = norms,
+    transform = trans,
+    analysis_method = "LM",
+
+    ### FOR PHYLUM LEVEL and other associations with TOTAL VE303
+    ##output = paste(Sys.Date(), tax_level, treats, dosing, "303tot rec_Wk8",model_type, sep = " "), 
+    ##fixed_effects = c( "TRT.norm" ,  "Batch", "rec.diagnosis.Wk8", "VE303"),
+    #fixed_effects = c( "TRT.norm" ,"rec.TRT", "Batch", "VE303"),
+    
+    ### FOR SPECIES LEVEL
+    output = paste(Sys.Date(), tax_level, treats, dosing,trans, norms, "303tot rec_Wk8",model_type, sep = " "), 
+    fixed_effects = fixed_model,
+    reference = ref_level,
+    
+    #fixed_effects = c("TRT.norm", "rec.TRT", "Batch" ),
+    #fixed_effects = c("TRT.norm", "rec.TRT.combined", "Batch", "VE303" ),
+    random_effects = c("Subject.Number")) ) )
+  
+
+}
+
+print("Done")
+}
+
+
+```
+
+# wrangle model outputs to combine all taxonomic levels analysis from Maaslin for plotting and summaries
+```{r}
+
+modeltype <- model_description[4]
+
+if(run_maaslin == "Yes"){model_type <- modeltype
+  model_description
+  #output = paste(Sys.Date(), tax_level, treats, dosing, "rec_Wk8",model_type, sep = " ")
+  #output_save = paste( tax_level, treats, dosing,"rec_Wk8",model_type, sep = " ")
+
+  #output = paste(Sys.Date(), tax_level, treats, "rec_Wk8",model_type, sep = " ")
+  #output_save = paste( tax_level, treats, "rec_Wk8",model_type, sep = " ")
+
+  #output = paste(Sys.Date(), tax_level, treats, "combined rec_Wk8",model_type, sep = " ")
+  #output_save = paste( tax_level, treats, "combined rec_Wk8",model_type, sep = " ")    
+#Sys.Date()
+  output = paste(Sys.Date(), tax_level, treats, dosing, trans,norms,"303tot rec_Wk8",model_type, sep = " ")
+  output_save = paste( tax_level, treats, dosing, trans,norms, "303tot rec_Wk8",model_type, sep = " ")
+
+  model_result = read_tsv(here(paste(output, "all_results.tsv", sep = "/")))
+  models_list <- list()
+
+  for (x1 in (model_result$metadata %>% unique())) {
+    model_result1 <- model_result %>% 
+      filter(metadata == x1)
+
+    model_result2 <- model_result1[
+    with(model_result1, order(value, pval)),] %>%
+    filter(pval < 1.0)
+    models_list <-  append(models_list, list(model_result2))
+    #write_csv(model_result2, path = here(output, paste(x1, output_save , ".csv", sep=" ")))
+    #write.xlsx(model_result2, here(output, paste(x1, output_save , ".xlsx", sep=" ")), sheetName = x1, col.names = TRUE  
+    }
+
+  models_1 <- lapply(models_list, function(x) cbind(" "=rownames(x), x))
+  ## Writes to multi sheet excel file ###
+  
+  writexl::write_xlsx(models_1, here(output, paste(output_save , ".xlsx", sep=" ")) )
+  model_result$metadata %>% unique()
+  if(tax_level %in% c( "phylum","class","order", "family" ,"genus", "species") ){  pm <- models_1[[3]] %>% filter(value == "VE303 Dosed Good")}
+  if(tax_level %in% c(  "phylum")){  pm <- models_1[[2]] %>% filter(value == "VE303 Dosed Good")}
+
+#  model_result %>% filter(metadata == "rec.TRT.combined") %>% filter(pval < 0.05)
+}
+
+ 
+ 
+
+```
+
+ 
+
+# Call to R script with a function that returns pre-generated model results for Associations with response and with VE303 in VE303 dosed groups
+# If running above models, make sure the relevant files are appropiately named in the format "all_results_species_.tsv", "all_results_genus_.tsv" etc. and they are in the sub-folder 'Stats_results" so that the function below can pull them into figure scripts.
+
+
+```{r}
+
+reference_level <-"VE303 Dosed Good"
+source("PD_LME_Summary_Tables.R")
+ 
+```
+
+```{r, include=FALSE}
+
+# Use analysis file for model results up to day 14. 
+  
+foldername <- "Stats_results"
+#model_result = read_tsv(here(paste(folder_name, "all_results.tsv", sep = "/")))
+  
+p_all <- cleanup_summary_tables(folder_name = foldername, tax_l = "species")
+pptest_species <-  p_all[[1]]
+pVE303_species <-  p_all[[2]]
+
+covariate_rec <- pptest_species$Covariate %>% unique()
+covariate_VE303 <- pVE303_species$Covariate %>% unique()
+
+
+p_all <- cleanup_summary_tables(folder_name = foldername ,"genus")
+pptest_genus <- p_all[[1]]
+pVE303_genus <-  p_all[[2]]
+
+p_all <- cleanup_summary_tables(folder_name = foldername ,"family" )
+pptest_family <- p_all[[1]]
+pVE303_family <-  p_all[[2]]
+
+p_all <- cleanup_summary_tables(folder_name = foldername  ,"order" )
+pptest_order <- p_all[[1]]
+pVE303_order <-  p_all[[2]]
+
+p_all <- cleanup_summary_tables(folder_name = foldername  ,"class" )
+pptest_class <- p_all[[1]]
+pVE303_class <- p_all[[2]]
+
+  
+p_all <- cleanup_summary_tables(folder_name = foldername  ,"phylum" )
+pptest_phylum <- p_all[[1]]
+pVE303_phylum <- p_all[[2]]
+ 
+
+## Modified excel file for response associations
+pp_all <- list(pptest_species,pptest_genus, pptest_family, pptest_order, pptest_class, pptest_phylum)
+covariate <- covariate_rec
+
+names(pp_all) <- c("Species", "Genus", "Family", "Order", "Class", "Phylum")
+writexl::write_xlsx(pp_all, here(results, paste("AllTax_Dataframe" , ".xlsx", sep=" ")))
+
+filt_pp_all <- lapply(pp_all,function(x){x %>% filter(qval < 0.7)})
+bind_alltax <- do.call(rbind, filt_pp_all)
+Tax_type <- rownames(bind_alltax)
+bind_alltax <- cbind(Tax_type, bind_alltax)
+bind_alltax <- separate(bind_alltax, Tax_type, into = c("Taxa", "Extra"), extra = "merge") %>% 
+               select(-Extra)
+
+bind_alltax_rec <- bind_alltax 
+
+## Modified excel file for VE303 associations
+pp_all_VE303 <- list(pVE303_species, pVE303_genus, pVE303_family, pVE303_order, pVE303_class, pVE303_phylum)
+covariate <- covariate_VE303
+
+names(pp_all_VE303) <- c("Species", "Genus", "Family", "Order", "Class", "Phylum")
+
+filt_pp_all <- lapply(pp_all_VE303,function(x){x %>% filter(qval < 1.1)})
+bind_alltax <- do.call(rbind, filt_pp_all)
+Tax_type <- rownames(bind_alltax)
+bind_alltax <- cbind(Tax_type, bind_alltax)
+bind_alltax <- separate(bind_alltax, Tax_type, into = c("Taxa", "Extra"), extra = "merge") %>%
+               select(-Extra)
+bind_alltax_VE303 <- bind_alltax
+bind_alltax_save_VE303 <- bind_alltax %>% filter(qval < 0.05)
+
+
+
+```
+ 
+  
+
+## For plotting: Prepare model results from all taxonomic levels association analysis
+
+```{r}
+
+filt_pp_all <- lapply(pp_all,function(x){x %>% filter(qval < 0.4 & pval < 0.05)})
+bind_alltax <- do.call(rbind, filt_pp_all)
+Tax_type <- rownames(bind_alltax)
+bind_alltax <- cbind(Tax_type, bind_alltax)
+bind_alltax <- separate(bind_alltax, Tax_type, into = c("Taxa", "Extra"), extra = "merge") %>% 
+               select(-Extra) %>% 
+  rename( coef_recurrence = coef,  qval_recurrence = qval) 
+ 
+sig_rec <- bind_alltax$feature 
+
+bind_VE303 <- bind_alltax_VE303 %>% filter(feature %in% sig_rec) %>% 
+  rename( coef_VE303 = coef,  qval_VE303 = qval) %>%
+  select(feature, coef_VE303, qval_VE303)
+
+Lefse_recurrence_VE303 <- left_join(bind_alltax, bind_VE303, by="feature")
+Lefse_recurrence_VE303$Taxon_name <- Lefse_recurrence_VE303$feature
+
+Lefse_recurrence_VE303 <- separate(Lefse_recurrence_VE303, feature, into = c("higher_tax_name", "Extra"), extra = "merge") %>% select(-Extra)
+
+tax1 <-  Lefse_recurrence_VE303[Lefse_recurrence_VE303[["Taxa"]] %in% c("Species", "Genus"),]$higher_tax_name
+g1<-oc.abund.meta %>% filter(genus_name %in% tax1)  %>% distinct(genus_name, .keep_all = TRUE) %>% select(genus_name, class_name) %>% rename(higher_tax_name=genus_name )
+
+tax2 <-  Lefse_recurrence_VE303[Lefse_recurrence_VE303[["Taxa"]] %in% c("Family"),]$higher_tax_name
+g2<-oc.abund.meta %>% filter(tax_rank == "family" & tax_name %in% tax2)  %>% distinct(tax_name, .keep_all = TRUE) %>% select(tax_name, class_name) %>% rename(higher_tax_name=tax_name )
+
+
+tax3 <-  Lefse_recurrence_VE303[Lefse_recurrence_VE303[["Taxa"]] %in% c("Order"),]$higher_tax_name
+g3<-oc.abund.meta %>% filter(order_name %in% tax3)  %>% distinct(order_name, .keep_all = TRUE) %>% select(order_name, class_name) %>% rename(higher_tax_name=order_name )
+
+tax4 <-  Lefse_recurrence_VE303[Lefse_recurrence_VE303[["Taxa"]] %in% c("Class"),]$higher_tax_name
+g4 = as.data.frame(tax4) %>% rename(class_name = tax4)
+g4$higher_tax_name = g4$class_name
+
+
+class_annotation <- do.call(rbind,list(g1,g2,g3,g4))
+Lefse_recurrence_VE303 <- left_join(Lefse_recurrence_VE303, class_annotation, by = "higher_tax_name")
+
+Lefse_recurrence_VE303$stars <- cut(Lefse_recurrence_VE303$qval_VE303, breaks=c(-Inf, 0.001, 0.01, 0.05, 0.1, Inf), label=c("***", "**", "*","." ,""))  # Create column of significance labels
+
+Lefse_recurrence_VE303
+
+```
+
+# Make Lefse style Bar chart for all significant associations with response across taxonomic levels
+# No Additional VE303 annotation heatmap layer, does not need patchwork
+# Extended Data Figure 6 barplots
+
+```{r}
+
+NCBI.class.cols <- c("Actinobacteria" = "chartreuse4", "Bacilli" = "firebrick",  
+"Bacteroidia" ="navyblue", "Clostridia" = "#008e74", "Erysipelotrichia" ="royalblue4", "Epsilonproteobacteria" ="peru", "Fusobacteriia" = "darkgoldenrod3", "Gammaproteobacteria" ="red", "Negativicutes"= "maroon" )
+
+
+Lefse_bars <- Lefse_recurrence_VE303 %>% 
+                  arrange(coef_recurrence) %>%    
+  # First sort by val. This sort the dataframe but NOT the factor levels
+                  mutate(name=factor(Taxon_name, levels=Taxon_name))  %>%
+  mutate(Taxa = factor(Taxa, levels = c("Species", "Genus", "Family", "Order", "Class")))
+# This trick update the factor levels
+
+
+bars <- ggplot(Lefse_bars, aes(x = name , y = coef_recurrence, fill=as.factor(class_name) )) + 
+  geom_bar(stat="identity",  alpha = 0.5) +
+  coord_flip() +
+ xlab("") +
+ scale_fill_manual(values = NCBI.class.cols) +
+ scale_color_manual(values = NCBI.class.cols) +
+  facet_wrap(~Taxa, scales = "free_y") +
+  theme_bw() +
+
+  theme(axis.text.y = element_text(size=14),axis.title.y = element_text(size=14),
+        strip.text = element_text(size=14, face ="bold", colour ="black"),
+    legend.text = element_text(size = 14, face ="bold", colour ="black"),
+        axis.text.x = element_text(angle = 0, hjust = 1, vjust = 0.5, size = 14),
+        axis.title.x = element_text(size=14), strip.text.x = element_text(size=14),
+        strip.text.y = element_text(size=14),  
+    legend.title = element_text(size=14, face ="bold", colour ="black"),
+    legend.position = c(0.9, 0.2)) +
+   labs(y= "Effect size", fill = "Taxonomic Class")
+ 
+ ggsave(filename = here(results, paste("AllTax_BarEffects_AssocRecWk8_Dosed_EXTFIG 6 raw.pdf", sep = " ")), 
+        width = 16, height = 7)
+
+ 
+ 
+```
+
+## Rough VE303 model heatmap for saving legend colorbar indcating endogenous taxa correlations with VE303
+```{r}
+ 
+Lefse_bars$stars <- cut(Lefse_bars$qval_VE303, breaks=c(-Inf, 0.001, 0.01, 0.05, 0.1, Inf), label=c("***", "**", "*","." ,""))  # Create column of significance labels
+Lefse_bars$X_heatmap <- 1.0
+  Lefse_bars <- Lefse_bars %>% arrange(Taxa)
+  sig_rec <- Lefse_bars$Taxon_name
+  Lefse_bars$Taxon_name <- factor(Lefse_bars$Taxon_name, levels = sig_rec) 
+
+  p <- ggplot(Lefse_bars, aes(X_heatmap, Taxon_name, fill= coef_VE303 )) + 
+  geom_tile(color = "black") +
+    geom_text(aes(label=stars), color="black", size=5) + 
+        scale_fill_gradient2(low="#D7191C", mid="white", high="#2C7BB6") +
+
+    theme_bw() +
+    guides(fill = guide_colourbar(title = "Correlation with VE303", size = 16)) +
+    theme(axis.text.y = element_text(size = 8),axis.text.x = element_blank() ,
+          axis.ticks = element_blank(), panel.background = element_blank(),
+          panel.border = element_blank(), panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), legend.title = element_text(size=14),
+          legend.text = element_text(size = 14))+
+   
+    labs(y= "",x = "")
+  p
+  
+   ggsave(filename = here(results, paste(Sys.Date(), "VE303 ANNOTATION LEGEND.pdf", sep = " ")), 
+        width = 9, height = 8)
+
+
+```
+# Function for integrating Lefse style barplits with VE303 annotation heatmaps
+```{r}
+
+plot_Lefse_heatmap <- function(Lefse_rec, taxtype, legend_pos){
+  
+NCBI.class.cols <- c("Actinobacteria" = "chartreuse4", "Bacilli" = "firebrick",  
+"Bacteroidia" ="navyblue", "Clostridia" = "#008e74", "Erysipelotrichia" ="royalblue4", "Epsilonproteobacteria" ="peru", "Fusobacteriia" = "darkgoldenrod3", "Gammaproteobacteria" ="red", "Negativicutes"= "maroon" )
+
+Lefse_bars <- Lefse_rec %>% filter(Taxa == taxtype) %>%
+                  arrange(coef_recurrence) %>%    
+  # First sort by val. This sort the dataframe but NOT the factor levels
+                  mutate(name=factor(Taxon_name, levels=Taxon_name))  %>%
+  mutate(Taxa = factor(Taxa, levels = c("Species", "Genus", "Family", "Order", "Class")))
+# This trick update the factor levels
+
+Lefse_bars
+
+bars <- ggplot(Lefse_bars, aes(x = name , y = coef_recurrence, fill=as.factor(class_name) )) + 
+  geom_bar(stat="identity",  alpha = 0.5) +
+  coord_flip() +
+ xlab("") +
+ scale_fill_manual(values = NCBI.class.cols) +
+ scale_color_manual(values = NCBI.class.cols) +
+  facet_wrap(~Taxa, scales = "free_y") +
+  scale_y_continuous(limits = c(-2.9, 3.1))+
+  theme_bw() +
+
+  theme(axis.text.y = element_text(size=14),axis.title.y = element_text(size=14),
+         legend.text = element_blank() ,
+        axis.text.x = element_text(angle = 0, hjust = 1, vjust = 0.5, size = 14),
+       strip.text = element_text(size=14, face ="bold", colour ="black"),
+        axis.title.x = element_text(size=14), strip.text.x = element_text(size=14),
+        strip.text.y = element_text(size=14),  
+    legend.title = element_blank() ,
+    legend.position = legend_pos) +
+   labs(y= "Effect size", fill = "Taxonomic Class")
+
+################################################################################################
+
+  Lefse_bars$X_heatmap <- 1.0
+  Lefse_bars <- Lefse_bars %>% arrange(Taxa)
+  sig_rec <- Lefse_bars$Taxon_name
+  Lefse_bars$Taxon_name <- factor(Lefse_bars$Taxon_name, levels = sig_rec) 
+
+  p <- ggplot(Lefse_bars, aes(X_heatmap, Taxon_name, fill= coef_VE303 )) + 
+  geom_tile(color = "black") +
+    geom_text(aes(label=stars), color="black", size=5) + 
+    scale_fill_gradient2(low="#D7191C", mid="white", high="#2C7BB6") +
+
+    theme_bw() +
+    guides(fill = guide_colourbar(title = "Correlation with VE303")) +
+    theme(axis.text.y = element_blank(),axis.text.x = element_blank() ,
+          axis.ticks = element_blank(), panel.background = element_blank(),
+          panel.border = element_blank(), panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), legend.position = legend_pos)+
+    labs(y= "",x = "")
+
+patch1 <- bars + p + 
+  plot_layout(widths = c(10, 1)) 
+
+ggsave(filename = here(results, paste(Sys.Date(),   taxtype,"Annotate VE303 Recurrence Associated.pdf", sep = " ")), width = 7, height = 4)
+
+return(patch1)}
+
+
+
+
+ 
+```
+
+```{r}
+Taxa_cycle <-  c("Species", "Genus", "Family", "Order", "Class")
+#plot_list <- list()
+
+for (ttype in Taxa_cycle) {
+  ss <- plot_Lefse_heatmap(Lefse_rec = Lefse_recurrence_VE303, taxtype = ttype, legend_pos = "none")
+ 
+}
+  
+
+ttype = Taxa_cycle[1]
+s1 <- plot_Lefse_heatmap(Lefse_rec = Lefse_recurrence_VE303, taxtype = ttype, legend_pos = "none")
+ttype = Taxa_cycle[2]
+s2 <- plot_Lefse_heatmap(Lefse_rec = Lefse_recurrence_VE303, taxtype = ttype, legend_pos = "none")
+ttype = Taxa_cycle[3]
+s3 <- plot_Lefse_heatmap(Lefse_rec = Lefse_recurrence_VE303, taxtype = ttype, legend_pos = "none")
+ttype = Taxa_cycle[4]
+s4 <- plot_Lefse_heatmap(Lefse_rec = Lefse_recurrence_VE303, taxtype = ttype, legend_pos = "none")
+ttype = Taxa_cycle[5]
+s5 <- plot_Lefse_heatmap(Lefse_rec = Lefse_recurrence_VE303, taxtype = ttype, legend_pos = "none")
+
+
+A1 = (s1 | s2 | s3)
+ggsave(filename = here(results, paste(Sys.Date(),  "ALLTAX_TOPROW Annotate VE303 Rec_Associated_EXTFIG 6.png", sep = " ")), width = 17, height = 4, dpi = 600)
+
+A1 = (s4 | s5)
+ggsave(filename = here(results, paste(Sys.Date(),  "ALLTAX_BOTTOMROW Annotate VE303 Rec_Associated_EXTFIG 6.png", sep = " ")), width = 12, height = 4, dpi = 600)
+
+```
+
+```{r}
+
+foldername <- "Stats_results"
+model_result = read_tsv(here(paste(folder_name = foldername, "all_results_species_.tsv", sep = "/")))
+
+models_list <- list()
+
+for (x1 in (model_result$metadata %>% unique())) {
+  model_result1 <- model_result %>% 
+    filter(metadata == x1)
+
+  model_result2 <- model_result1[
+  with(model_result1, order(value, pval)),] %>%
+  filter(pval < 1.0)
+  
+  models_list <-  append(models_list, list(model_result2))
+
+  }
+
+models_1 <- lapply(models_list, function(x) cbind(" "=rownames(x), x))
+## Writes to multi sheet excel file ###
+
+
+g <- filter(oc.sp.long.rel.meta, grepl("VE303",Species.corrected))
+filtspecies[grepl("VE303",filtspecies)]
+
+pm <- models_1[[2]] %>% filter(grepl("VE303", feature)) 
+
+if(dosing == "combined"){pm1 <- models_1[[3]] %>% filter(value == "VE303 Dosed Good") }
+if(dosing != "combined"){pm1 <- models_1[[1]]}
+ 
+
+```
+
+```{r}
+
+ncbi_taxa <- str_replace_all(pm1$feature, "\\.", " ") 
+ncbi_taxa <- str_replace_all(ncbi_taxa, "sp ", "sp. ") 
+ncbi_taxa <- str_replace_all(ncbi_taxa, "  ", " ") 
+
+pm1$NCBI.Species.corrected <- ncbi_taxa
+
+map <- oc.abund.meta %>% filter(NCBI.Species.corrected %in% ncbi_taxa) %>% select( NCBI.Species.corrected, GTDB.Species.corrected, GTDB_phylum,GTDB_class, NCBI.phylum_name, NCBI.class_name) %>% distinct(NCBI.Species.corrected, .keep_all = TRUE)
+
+ 
+
+map$GTDB.Species.corrected <- if_else(is.na(map$GTDB.Species.corrected), map$NCBI.Species.corrected, 
+                                      if_else(map$GTDB.Species.corrected=="Longicatena innocuum", 
+                                              "Absiella innocuum" , map$GTDB.Species.corrected))
+
+map$GTDB.Species.corrected <- if_else(map$GTDB.Species.corrected == "Absiella sp. MP624E10_ig1", 
+                                              "Absiella innocuum", map$GTDB.Species.corrected)
+ 
+
+
+dosed_models <- left_join(pm1, map, by="NCBI.Species.corrected") #%>% distinct(GTDB.Species.corrected, .keep_all = TRUE)
+dosed_models$GTDB.Species.corrected <- if_else(is.na(dosed_models$GTDB.Species.corrected), dosed_models$NCBI.Species.corrected, 
+                                      dosed_models$GTDB.Species.corrected)
+
+dosed_models$GTDB.Species.corrected <- if_else(dosed_models$GTDB.Species.corrected == "Absiella sp. VE303 07", 
+                                              "Absiella innocuum", dosed_models$GTDB.Species.corrected)
+
+
+dosed_models$GTDB.Species.corrected <- if_else(dosed_models$feature == "Morganella.sp...in..Bacteria.", 
+                                              "Morganella sp.", dosed_models$GTDB.Species.corrected)
+
+dosed_models$GTDB_phylum <- if_else(is.na(dosed_models$GTDB_phylum), dosed_models$NCBI.phylum_name, 
+                                      dosed_models$GTDB_phylum)
+
+dosed_models$GTDB_phylum <- if_else((dosed_models$GTDB_phylum == "Actinobacteria" ), "Actinobacteriota",
+                                    if_else((dosed_models$GTDB_phylum == "Fusobacteria" ), "Fusobacteriota",
+                                      dosed_models$GTDB_phylum))
+
+dosed_models$GTDB_phylum <- if_else((dosed_models$GTDB.Species.corrected == "Roseburia inulinivorans CAG 15"),
+                                            "Firmicutes_A",
+                              if_else((dosed_models$GTDB.Species.corrected == "Blautia sp. HF17"),
+                                            "Firmicutes",
+                               if_else((dosed_models$GTDB.Species.corrected == "Blautia sp. CAG 257"),
+                                            "Firmicutes",
+                                if_else((dosed_models$GTDB.Species.corrected == "Clostridia bacterium UC5 1 1A9"),
+                                            "Firmicutes",
+                                    dosed_models$GTDB_phylum))))
+
+
+
+dosed_models$GTDB_class <- if_else((dosed_models$GTDB.Species.corrected == "Roseburia inulinivorans CAG 15"),
+                                            "Clostridia",
+                              if_else((dosed_models$GTDB.Species.corrected == "Blautia sp. HF17"),
+                                            "Clostridia",
+                               if_else((dosed_models$GTDB.Species.corrected == "Blautia sp. CAG 257"),
+                                            "Clostridia",
+                                if_else((dosed_models$GTDB.Species.corrected == "Clostridia bacterium UC5 1 1A9"),
+                                            "Clostridia",
+                                    dosed_models$GTDB_class))))
+
+ 
+
+
+dosed_models$NCBI.Species.corrected <- if_else((dosed_models$NCBI.Species.corrected == "Blautia sp. MP87C11"),
+                                            "Blautia massiliensis",
+                              if_else((dosed_models$NCBI.Species.corrected == "Proteus sp. MP392B6"),
+                                            "Proteus sp003144505",
+                              if_else((dosed_models$NCBI.Species.corrected == "Hungatella sp. MP403D11"),
+                                            "Hungatella effluvii",
+                               if_else((dosed_models$NCBI.Species.corrected == "Bacteroides sp. MP244D10"),
+                                            "Bacteroides thetaiotaomicron",
+                              if_else((dosed_models$NCBI.Species.corrected == "Parabacteroides sp. MP340C12"),
+                                            "Parabacteroides distasonis",
+                              if_else((dosed_models$NCBI.Species.corrected == "Blautia sp. MP87G3"),
+                                            "Blautia sp. VE303 05",
+                                      dosed_models$NCBI.Species.corrected))))))
+
+dosed_models$NCBI.class_name <- if_else(grepl("Ruminococcus",dosed_models$NCBI.Species.corrected),
+                                            "Clostridia",
+                              if_else(grepl("Anaerotruncus",dosed_models$NCBI.Species.corrected),
+                                            "Clostridia",
+                              if_else(grepl("Firmicutes",dosed_models$NCBI.Species.corrected),
+                                            "Clostridia",
+                               if_else(grepl("Flavonifractor",dosed_models$NCBI.Species.corrected),
+                                            "Clostridia",
+                              if_else(grepl("Lachnospiraceae",dosed_models$NCBI.Species.corrected),
+                                            "Clostridia",
+                               if_else((dosed_models$NCBI.Species.corrected == "Bacteroides caccae CAG 21"),
+                                            "Bacteroidia",
+
+                                      dosed_models$NCBI.class_name))))))
+
+dosed_models$NCBI.class_name <- if_else(grepl("Roseburia",dosed_models$GTDB.Species.corrected),
+                                            "Clostridia",
+                              if_else(grepl("Blautia",dosed_models$GTDB.Species.corrected),
+                                            "Clostridia",
+                              if_else((dosed_models$GTDB.Species.corrected == "Holdemania sp. Marseille P2844"),
+                                            "Clostridia",
+                              if_else((dosed_models$GTDB.Species.corrected == "Absiella innocuum"),
+                                            "Clostridia",
+                              if_else((dosed_models$GTDB.Species.corrected == "Ruminococcus sp. MSPR13"),
+                                            "Clostridia",
+                              if_else(grepl("Clostrid",dosed_models$GTDB.Species.corrected),
+                                            "Clostridia",
+                              if_else(grepl("Veillonella",dosed_models$GTDB.Species.corrected),
+                                            "Negativicutes",
+                              if_else(grepl("Dialister",dosed_models$GTDB.Species.corrected),
+                                            "Negativicutes",
+                              if_else((dosed_models$GTDB.Species.corrected == "Morganella sp."),
+                                            "Gammaproteobacteria",
+                              if_else(grepl("VE303",dosed_models$GTDB.Species.corrected),
+                                            "Clostridia",
+                                    dosed_models$NCBI.class_name))))))))))
+ 
+
+
+
+relatives_names <- c("Clostridium_M bolteae",  "Anaerotruncus colihominis", 
+                     "Sellimonas intestinalis","Clostridium_Q symbiosum",  "Blautia sp001304935", "Blautia marasmi",
+                     "Dorea longicatena", "Absiella innocuum", "Flavonifractor sp000508885","Flavonifractor plautii")
+ 
+relatives_VE303_names <- c("Clostridium_M bolteae", "Anaerotruncus colihominis", 
+                     "Sellimonas intestinalis","Clostridium_Q symbiosum", "Blautia sp. VE303 05",
+                     "Dorea sp. VE303 06", "Absiella innocuum", "Flavonifractor sp. VE303 08")
+  
+
+relatives_HD <- c( "Clostridium_Q symbiosum", "Blautia sp. VE303 05", 
+                  "Absiella innocuum", "Flavonifractor sp. VE303 08")
+ 
+relatives_LD <- c("Clostridium_M bolteae","Absiella innocuum")
+
+
+relatives_Placebo <- c( "Clostridium_M.symbiosum",  "Anaerotruncus.colihominis")
+ 
+ 
+
+relatives_combined_NCBI <- c( "Clostridium.sp..VE303.04"  , "Blautia.sp..VE303.05", "Blautia.sp..MP87G3","Flavonifractor.sp..VE303.08",
+                              "Absiella.sp..VE303.07", "Lachnoclostridium.sp..VE303.01", "Dorea.sp..VE303.06" ,
+                              "Sellimonas.sp..VE303.03" ,  "Anaerotruncus.sp..VE303.02"  )
+
+if(dosing %in% c("HD")){ 
+  #Dosed_volcano1 <- models_1[[1]]
+    Dosed_volcano1 <- dosed_models %>% distinct(GTDB.Species.corrected, .keep_all = TRUE)
+  relatives <- relatives_HD}
+
+if(dosing %in% c("LD")){ 
+  Dosed_volcano1 <- dosed_models %>% distinct(GTDB.Species.corrected, .keep_all = TRUE)
+  #Dosed_volcano1 <- models_1[[1]]
+  relatives <- relatives_LD}
+
+if(dosing %in% c("Placebo")){ 
+  Dosed_volcano1 <- dosed_models %>% distinct(GTDB.Species.corrected, .keep_all = TRUE)
+#  Dosed_volcano1 <- models_1[[1]]
+  relatives <- relatives_Placebo}
+
+if(dosing %in% c("combined")){ 
+  Dosed_volcano1 <- dosed_models %>% filter(value == "VE303 Dosed Good")  
+  relatives <- relatives_combined_NCBI}
+ 
+ 
+
+```
+ 
+
+```{r}
+ 
+
+ 
+relatives_combined_NCBI <- c( "Clostridium.sp..VE303.04"  ,  "Blautia.sp..VE303.05","Flavonifractor.sp..VE303.08", "Absiella.sp..VE303.07", "Lachnoclostridium.sp..VE303.01", "Dorea.sp..VE303.06" ,"Sellimonas.sp..VE303.03" ,  "Anaerotruncus.sp..VE303.02"  )
+ 
+
+relatives_qsig_fewsp <- c(  "Flavonifractor.sp..VE303.08", "Anaerotruncus.sp..VE303.02")
+relatives <- relatives_combined_NCBI
+
+
+coef_factor = 1.0
+pcut <- 0.2
+ggplot(Dosed_volcano1, aes(x = coef_factor*coef, y = -1*log10(qval) )) + 
+  geom_point(aes(colour = cut(coef_factor*coef, c(-Inf, -1.5, 1.5, Inf))), size = 3, alpha = 0.3) +
+  scale_color_manual(name = "Effect size", values = c("(-Inf,-1.5]" = "blue", 
+                                                      "(-1.5,1.5]" = "black", "(1.5, Inf]" = "blue")) + 
+  geom_point(data=Dosed_volcano1 %>% filter(feature %in% relatives ), colour = "orange", size = 3, alpha = 0.9) +
+  
+  #geom_label_repel( data=Dosed_volcano1 %>% filter(GTDB.Species.corrected %in% relatives_VE303_names),aes(label=GTDB.Species.corrected),  box.padding = 1.0, max.overlaps = 50) +
+  geom_hline(yintercept = -1*log10(pcut), linetype="longdash", color="red") +
+  geom_vline(xintercept = 0, linetype="longdash", color="black") +
+  #geom_hline(yintercept = -1*log10(0.05), linetype="longdash", color="red") +
+  theme(axis.text.y = element_text(size=14),axis.title.y = element_text(size=14),
+        axis.text.x = element_text(angle = 0, hjust = 1, vjust = 0.5, size = 14),
+        axis.title.x = element_text(size=14), strip.text.x = element_text(size=14),
+        strip.text.y = element_text(size=14)) +
+  
+  #geom_text_repel( data=Dosed_volcano1 %>% filter(feature %in% relatives_qsig_fewsp ),aes(label=NCBI.Species.corrected), box.padding = 1.0,  max.overlaps = 17) +
+  
+  geom_text_repel( data=Dosed_volcano1 %>% filter(feature %in% relatives),aes(label=feature), box.padding = 1.0, 
+                     max.overlaps = 17) +
+  
+  labs(x= "Effect size" , y= "-log10 q-value")
+
+ggsave(filename = here(results, paste(Sys.Date(), "qv_0.2 Volcano_Dosed_Figure 5B.png", sep = " ")), 
+       width = 7, height = 5, dpi = 600 )
+
+```
+  
+   
+     
+
+```{r}
+ 
+ 
+NCBI.class.cols <- c("Actinobacteria" = "chartreuse4", "Bacilli" = "firebrick",  
+"Bacteroidia" ="navyblue", "Clostridia" = "#008e74", "Erysipelotrichia" ="royalblue4", "Epsilonproteobacteria" ="peru", "Fusobacteriia" = "darkgoldenrod3", "Gammaproteobacteria" ="red", "Negativicutes"= "maroon" )
+qcut <- 0.05
+effcut <-0.2
+
+ 
+Dosed_volcano2 <- Dosed_volcano1 %>% filter((pval < qcut) & ((coef > effcut) | (coef < -1*effcut)) ) %>%
+                  arrange(coef) %>%    # First sort by val. This sort the dataframe but NOT the factor levels
+                  mutate(name=factor(NCBI.Species.corrected, levels=NCBI.Species.corrected))    # This trick update the factor levels
+  
+ 
+
+ggplot(Dosed_volcano2, aes(x = name , y = coef_factor*coef, fill=as.factor(NCBI.class_name) )) + 
+  geom_bar(stat="identity",  alpha = 0.5) +
+  coord_flip() +
+ xlab("") +
+ scale_fill_manual(values = NCBI.class.cols) +
+ scale_color_manual(values = NCBI.class.cols) +
+  theme_bw() + 
+ 
+   theme(axis.text.y = element_text(size=14),axis.title.y = element_text(size=14),
+         axis.text.x = element_text( angle = 0, hjust = 1, vjust = 0.5, size = 15),
+         axis.title.x = element_text(size=14), strip.text.x = element_text(size=14),
+         strip.text.y = element_text(size=14), legend.text = element_text(size = 14),
+         legend.title = element_text(size = 14)) +
+#   ylim(-0.2,6.4) +
+   labs(y= "Effect size", fill= "Taxonomic class")
+# 
+ ggsave(filename = here(results, paste(Sys.Date(),"p.05 eff.2 BarEffects_SpeciesAssocRecWk8_Dosed_Figure 5C.png", sep = " ")), 
+        width = 10, height = 7, dpi = 600)
+ 
+
+```
+ 
+           
+ 

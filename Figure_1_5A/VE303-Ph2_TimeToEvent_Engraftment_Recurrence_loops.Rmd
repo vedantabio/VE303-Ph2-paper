@@ -1,0 +1,647 @@
+---
+title: "VE303-Ph2-AnalysisWorkflow to assign engraftment categories and create Time To Adverse Event Curve."
+author: "Rajita M"
+date: "2024/08/22"
+output: html_document
+---
+
+## Workflow to assess VE303-002 data for 79 patients
+## Note packages and source files here
+```{r, warning=FALSE, include=FALSE}
+
+
+library(haven)
+library(openxlsx)
+library(RColorBrewer)
+library(tidyverse)
+library(vegan)
+library(here)
+library(ggrepel)
+library(ggpubr)
+library(scales)
+library(nlme)
+library(lme4)
+library(survminer)
+library(survival)
+library(ranger)
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+library(ggfortify)
+library(sandwich)
+library(msm)
+library(writexl)
+library(broom)
+library(PupillometryR)
+
+source("colors.R") #source colors
+
+
+```
+
+## Print R version and working directory.
+```{r}
+#sessionInfo()
+here()
+```
+
+## Set up directory structure for output - this will create a new directory with the current date to save results to
+```{r, include=FALSE}
+results <- paste(Sys.Date(), "TimeToEvent", sep = "_")
+dir.create(here(results), showWarnings = TRUE)
+
+
+show.me <- function(x){
+  if(as.data.frame(x[, c("rec.diagnosis")])[,1][1] == "Bad"){x$rec.day.in.treatment.surv <- x$rec.day.in.treatment.surv}
+  if(as.data.frame(x[, c("rec.diagnosis")])[,1][1] == "Good"){x$rec.day.in.treatment.surv <- max(x$Day.in.treatment)}
+  return(x)}
+
+
+calc_prop_7or14 <- function(a){
+  if( ( (c("Day 7") %in% a$Visit.Name.Norm) & (!c("Day 14") %in% a$Visit.Name.Norm))){a$prop_D7orD14  <- a[a["Visit.Name.Norm"] == "Day 7",]$Day.7} 
+  if( (c("Day 14") %in% a$Visit.Name.Norm) ){a$prop_D7orD14  <- a[a["Visit.Name.Norm"] == "Day 14",]$Day.14} 
+  if(( (!c("Day 7") %in% a$Visit.Name.Norm) & (!c("Day 14") %in% a$Visit.Name.Norm)) ){a$prop_D7orD14  <- NA} 
+                          return(a)}
+                
+
+
+```
+
+## Load required files
+```{r, include=FALSE}
+## Import cleaned metadata Based on merged SPR
+
+dnameta = read_csv(here("Input files/2022-03-08 VE303_dna_metadata_80IA_mult.csv"))
+
+#### Import updated  marker panel with targeted relative abundance estimation : TO BE COMBINED with metadata file
+ve303 = read_csv(here("Input files/2022-01-11 VE303_Ph2_Extended_Marker_Data.csv"))
+
+## Import cleaned recurrence metadata
+
+## Final recurrence list with subject 103106 as non-recurrent
+rec = read_csv(here("Input files/2022-03-09 CDI_Recurrences_IA2_treatment_assignment-OUT.csv"))
+
+## Import cleaned conmeds metadata
+conmed = read_csv(here("Input files/2021-10-05 VE303-002_ConMeds_treatment_assignment-OUT.csv"))
+
+
+## Import primary vs secondary CDI population metadata
+study_pops = read_csv(here("Input files/2022-03-16 VE303 prior CDI summary.csv")) %>%
+  rename(Subject.Number = Subject)
+
+#### Import simpson and inverse simpson index per sample calculated in endogenous taxa processing notebook in PD R markdown file
+simpson = read.csv(here("Input files/2024-02-19 Species_Simpson_Indices.csv"))
+
+adtte <- read_xpt("Input files/adtte.xpt")  %>% 
+  filter(PARAM =="Time to CDI Recurrence, Sensitivity 2") %>% 
+  mutate( Subject.Number = as.numeric(SUBJID)) %>%
+  select( Subject.Number,AVAL, CNSR) %>%
+  rename(time_rec = AVAL,
+         status_rec = CNSR)
+
+adsl <- read_xpt("Input files/adsl.xpt")
+
+adtte_mod <- adtte %>% left_join(dnameta %>% 
+                                   select(Subject.Number, TRT.norm) %>%
+                                   distinct(Subject.Number, .keep_all = TRUE), by = "Subject.Number")
+
+adtte_mod
+```
+
+ 
+
+ 
+
+
+## Merge Extended marker panel with metadata to create VE303 subject level data file
+## Merge VE303 subject level data and ConMed data to establish time of abx dosing and interaction with recurrence
+## Merge VE303 subject level data and recurrence data 
+
+```{r}
+analysis_78 <- "yes"
+
+## Uses files imported above ##
+source("VE303.data.import.merge.R")
+
+ve303.dnameta <- ve303.dnameta %>% left_join(simpson, by = "MGS.Sample.ID")  
+
+```
+
+ 
+
+ 
+
+```{r}
+
+ve303.dnameta_preabx <- ve303.dnameta %>% filter(collect.pre.post.abx == "Pre.abx")  
+ve303.dnameta_allabx <- ve303.dnameta 
+
+taxplot <- "Pre Abx"
+
+if(taxplot == "Pre Abx"){
+  #Add frequency variable for all rows - this gives every detection/non-det result a value of 1
+  ve303.dnameta_plot <- data.frame(ve303.dnameta_preabx, freq = 1)
+}
+
+if(taxplot == "All Abx"){
+  #Add frequency variable for all rows - this gives every detection/non-det result a value of 1
+  ve303.dnameta_plot <- data.frame(ve303.dnameta_allabx, freq = 1)
+}
+
+ve303.dnameta_allabx %>% distinct(Subject.Number, .keep_all = TRUE) %>% filter(TRT.norm != "Placebo")
+
+ve303.dnameta_allabx %>% filter(Visit.Name == "Day 14") %>% distinct(Subject.Number, .keep_all = TRUE) %>% filter(TRT.norm != "Placebo") 
+
+ve303.dnameta_preabx %>% filter(Visit.Name == "Day 14") %>% distinct(Subject.Number, .keep_all = TRUE) %>% filter(TRT.norm != "Placebo")
+
+
+##To plot zeroes
+ve303.dnameta_plot.alt = ve303.dnameta_plot %>%
+  mutate(est_relative_abundance_panel_alt = if_else(detection_status != "Detected", 0, est_relative_abundance_panel)) %>%
+  group_by(Subject.Number, Visit.Name ) %>%
+  mutate(.,est_relative_abundance_panel_alt_sum = sum(est_relative_abundance_panel_alt)) %>%
+  ungroup()
+
+```
+
+ 
+
+```{r}
+
+
+
+event_type <- "Recurrence"
+
+####################################################################################################
+ve303_names <- ve303.dnameta_plot$organism %>% unique()
+plotting_tax <- c( "Proportion VE303", "VE303-08")
+
+# Uncomment below 2 lines to generate results for all strains -  cox model results for Table S3
+#plotting_tax1 <- c( "Proportion VE303")
+#plotting_tax <- c(plotting_tax1, ve303_names)
+
+
+plotting_coh <- c("Dosed" )
+quantiles <- c("Median" )
+
+whichmedian <- function(x) min(which(x > median(x)))
+
+#Choose day up to which engraftment will be calculated
+day_engraft <- 16
+day_engraft_start <- 12
+
+
+day_engraft_label <- "D14 only"
+prop_label <- "Separate Days"
+
+HD_KMtrt      <- c(29,29,26,25, 25, 25, 25, 25, 24, 24, 24, 24, 24, 24, 24, 24)
+LD_KMtrt      <- c(27,27,25,22, 20, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17)
+Placebo_KMtrt <- c(22,22,21,20, 19, 17, 16, 16, 16, 14, 13, 13, 13, 12, 12, 12)
+
+KMtrt_labels <- data.frame(HD_KMtrt, LD_KMtrt, Placebo_KMtrt)
+names(KMtrt_labels) <- c("VE303 High Dose", "VE303 Low Dose", "Placebo")
+
+Delta_labels = paste0("Delta = ", c(0.1, 0.2, 0.3))
+# A data frame with labels for each facet
+f_labels <- data.frame(TRT.norm = c("Placebo", "VE303 High Dose", "VE303 Low Dose"), 
+                       Delta_Annotate = Delta_labels)
+
+
+```
+
+
+
+
+
+#Code Below will generate KM and Cox analysis for 2-category High/Low Engraftment based on Median and Third quantiles 
+# AND 4-category Engraftment based on first - fourth quantiles 
+```{r}
+plot_tax <- "init"
+ 
+for (quantile in quantiles) {
+  for (plot_tax in plotting_tax) {
+    print(plot_tax)
+    for (plot_coh in plotting_coh) {
+      source("KM exposure recurrence quartile loops.R")
+    }
+  }
+  
+}
+
+
+```
+ 
+
+## Plot VE303 detection and calculate summary stats  - All DETECTED events Pre-Abx OR Pre- and Post-Abx  depending on selection in script
+#Add frequency variable for all rows - this gives every detection/non-det result a value of 1
+
+```{r, include=FALSE}
+
+source("VE303.tables.summary.stats.R")
+
+
+```
+
+## Plots VE303 colonization Figure 1A, Extended data figure 2A,B,C, Extended data Figure 9, 
+## Plots Age in recurrent vs non-recurrent dosed subjects: Extended data Figure 5B
+
+```{r, include=FALSE}
+
+
+ve303.dnameta <- ve303.dnameta_plot.alt
+source("plot.detection.allmark.R")
+
+
+```
+
+
+
+## Create tabular summary of VE303 strain detection at scheduled timepoints
+## Table S2
+```{r}
+
+CD_summary <- ve303.dnameta %>% filter(Visit.Name != "UNSCHED") %>% 
+  mutate(detection_binary = if_else(detection_status == "Detected", 1, 0) ) %>%
+  select(TRT.norm, Subject.Number, organism, Visit.Name, detection_binary) %>%
+  pivot_wider(names_from = Visit.Name, values_from = detection_binary) %>%
+  arrange(TRT.norm, organism) 
+#  arrange(TRT.norm, Subject.Number) 
+
+col_order <- c("TRT.norm", "Subject.Number" ,"organism" , "Screening", "Day 1" , "Day 7" ,
+                "Day 14" , "Day 28" , "Day 56", "Day 168"  )
+
+CD_summary1 <- CD_summary[, col_order]
+
+write.csv(CD_summary1, file = here(results, paste(Sys.Date(), taxplot, "Table S2_Collection_Detection_Summary.csv", sep = " ")), row.names = FALSE)
+
+```
+
+### VE303 Abundance - only detected strains
+```{r, include=FALSE}
+
+##To plot zeroes
+ve303.dnameta.det.alt = ve303.dnameta_plot %>%
+  mutate(est_relative_abundance_panel_alt = if_else(detection_status != "Detected", 0, est_relative_abundance_panel)) %>%
+  group_by(Subject.Number, Visit.Name ) %>%
+  mutate(.,est_relative_abundance_panel_alt_sum = sum(est_relative_abundance_panel_alt)) %>%
+  ungroup()
+
+ve303.dnameta.det.alt$rec.TRT1 =  paste((ve303.dnameta.det.alt$TRT.norm ),ve303.dnameta.det.alt$rec.diagnosis.Wk8)
+
+ve303.dnameta.det.alt$rec.TRT <- factor(ve303.dnameta.det.alt$rec.TRT1,levels = c("Placebo Bad" , "Placebo Good","VE303 High Dose Bad" ,"VE303 High Dose Good",  "VE303 Low Dose Bad","VE303 Low Dose Good"))
+
+
+ve303.dnameta.det.alt$rec.TRT.combined =  if_else(ve303.dnameta.det.alt$rec.TRT1 %in% c("VE303 High Dose Good", "VE303 Low Dose Good"), "VE303 Dosed Good", if_else(ve303.dnameta.det.alt$rec.TRT1 %in% c("VE303 High Dose Bad", "VE303 Low Dose Bad"), "VE303 Dosed Bad",ve303.dnameta.det.alt$rec.TRT1))
+
+ 
+source("VE303.abundance.summary.wrangling.R")
+
+# data frame used for diversity LME analyses # 
+vvtest5 <- ve303.dnameta.det.alt %>%
+  distinct(Subject.Number, Visit.Name.Norm, .keep_all = TRUE) 
+days_long <- c("Screening", "Day 1"  , "Day 7" , "Day 14" , "Day 28", "Day 56" , "Day 168")
+
+ 
+```
+ 
+
+
+## Plots for exposure to individual strains up to Day 14 across cohorts
+# Figure 1D
+```{r}
+
+exposures_relative <- ve303.dnameta.det.alt %>% 
+  filter(Visit.Name  %in%  c( "Day 7"  ,   "Day 14"  ) ) %>%  
+  #filter(Visit.Name  %in%  c( "Day 7"  ,   "Day 14"  ,  "Day 28") ) %>%  
+  select(Subject.Number, organism, TRT.norm, Visit.Name.Norm, Visit.Name,rec.diagnosis.Wk8, 
+         est_relative_abundance_panel_alt, MGS.Sample.ID) %>%
+  group_by(Subject.Number, TRT.norm, Visit.Name.Norm) %>% 
+  spread(organism, est_relative_abundance_panel_alt, fill=0) %>% # This fills in zeros for all events not detected - needed to calc mean
+  gather(organism, est_relative_abundance_panel_alt, 7: ncol(.)) %>% 
+  group_by(Subject.Number, organism) %>% 
+  mutate(subject_exposure_perstrain = mean(est_relative_abundance_panel_alt)) %>%
+  ungroup() %>%
+  distinct(Subject.Number, organism, .keep_all = TRUE) %>%  
+  select(Subject.Number, organism, TRT.norm,  rec.diagnosis.Wk8, subject_exposure_perstrain ) %>%
+  mutate(subject_exposure_binary = if_else(subject_exposure_perstrain>0, 1, 0))
+  
+  
+##############
+
+exposure_prevalence <-  exposures_relative %>%
+  group_by(organism, TRT.norm) %>%
+  mutate(fraction_exposed = sum(subject_exposure_binary)/n_distinct(Subject.Number)) %>%
+  ungroup()  %>%
+  select(organism, TRT.norm, fraction_exposed) %>%
+  distinct(organism, TRT.norm, .keep_all = TRUE)
+
+
+exposures <- exposure_prevalence
+exposures$TRT.norm = factor(exposures$TRT.norm,
+                                         levels = c("Placebo", "VE303 Low Dose"  , "VE303 High Dose"))
+textsize <- 16
+
+panel1D <- ggplot(exposures %>% filter(TRT.norm != "Placebo"), 
+       aes(x=organism, y=((fraction_exposed*100) ), fill=TRT.norm, color=TRT.norm)) +
+
+  geom_bar(stat="identity", alpha = 0.7, width = 0.5,position=position_dodge(width = 0.5) )+
+  theme_bw() +
+  #facet_grid(.~organism, scales = "free_x", space = "free") +
+  scale_fill_manual(values = coh.cols) +
+  scale_color_manual(values = coh.cols) +
+  theme(axis.text.x = element_text(size = textsize, angle = 45, hjust = 1, vjust =1), 
+        axis.title.x = element_text(size = textsize ),
+        plot.title = element_text(size = textsize ),
+        axis.text.y = element_text(size = textsize, hjust = 1, vjust =0.5) ,     
+        axis.title.y = element_text(size = textsize, hjust = 0.5, vjust = 1) ,
+        strip.text = element_text(size = textsize-3), legend.title = element_text(size = textsize),
+        legend.text = element_text(size = textsize -1)) +
+  #scale_x_discrete(labels = c("Placebo" = "Placebo" , "VE303 Low Dose" = "VE303\nLow Dose",
+  #                            "VE303 High Dose" = "VE303\nHigh Dose" )) +
+
+    labs(title= "", y="Strain prevalence, %", x="", 
+       color="Treatment", fill="Treatment" )
+ggsave(filename = here(results, paste(Sys.Date(), taxplot,"VE303 strain prevalence_Figure1D.pdf", sep = " ")), 
+       width = 13, height = 5, dpi = 800 )
+##############
+panel1D
+
+```
+ 
+## Plots for exposure to individual strains up to Day 28 across cohorts
+# Extended data Figure 2D
+```{r}
+
+exposures_relative <- ve303.dnameta.det.alt %>% 
+  #filter(Visit.Name  %in%  c( "Day 7"  ,   "Day 14"  ) ) %>%  
+  filter(Visit.Name  %in%  c( "Day 7"  ,   "Day 14"  ,  "Day 28") ) %>%  
+  select(Subject.Number, organism, TRT.norm, Visit.Name.Norm, Visit.Name,rec.diagnosis.Wk8, 
+         est_relative_abundance_panel_alt, MGS.Sample.ID) %>%
+  group_by(Subject.Number, TRT.norm, Visit.Name.Norm) %>% 
+  spread(organism, est_relative_abundance_panel_alt, fill=0) %>% # This fills in zeros for all events not detected - needed to calc mean
+  gather(organism, est_relative_abundance_panel_alt, 7: ncol(.)) %>% 
+  group_by(Subject.Number, organism) %>% 
+  mutate(subject_exposure_perstrain = mean(est_relative_abundance_panel_alt)) %>%
+  ungroup() %>%
+  distinct(Subject.Number, organism, .keep_all = TRUE) %>%  
+  select(Subject.Number, organism, TRT.norm,  rec.diagnosis.Wk8, subject_exposure_perstrain ) %>%
+  mutate(subject_exposure_binary = if_else(subject_exposure_perstrain>0, 1, 0))
+  
+  
+ 
+exposures <- exposures_relative
+exposures$TRT.norm = factor(exposures$TRT.norm,
+                                         levels = c("Placebo", "VE303 Low Dose"  , "VE303 High Dose"))
+textsize <- 14
+
+##############
+
+
+extfig2D <- ggplot(exposures, 
+       aes(x=organism, y=((subject_exposure_perstrain*100) + 0.01), fill=TRT.norm, color=TRT.norm)) +
+  geom_boxplot(alpha=.2,  outlier.shape = NA,width = 0.7,show.legend = TRUE ) +
+  geom_point(pch = 21, size = 2.5, alpha = 0.5, position = position_jitterdodge() , show.legend = FALSE ) +
+  theme_bw() +
+#  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+#  facet_grid(.~TRT.norm, scales = "free_x", space = "free") +
+  scale_fill_manual(values = coh.cols) +
+  scale_color_manual(values = coh.cols) +
+  theme(axis.text.x = element_text(size = textsize, angle = 45, hjust = 1, vjust =1), 
+        axis.title.x = element_text(size = textsize ),
+        plot.title = element_text(size = textsize ),
+        axis.text.y = element_text(size = textsize, hjust = 1, vjust =0.5) ,     
+        axis.title.y = element_text(size = textsize, hjust = 0.5, vjust = 1) ,
+        strip.text = element_text(size = textsize)) +
+ # scale_x_discrete(labels = c("Placebo" = "Placebo" , "VE303 Low Dose" = "VE303\nLow Dose",
+#                              "VE303 High Dose" = "VE303\nHigh Dose" )) +
+  scale_y_log10( ) +
+  labs(title= "", y="Mean exposure per subject, %", x="", 
+       color="Treatment", fill="Treatment" )
+ggsave(filename = here(results, paste(Sys.Date(), taxplot,"VE303 exposure per subject_EXT Figure2D.pdf", sep = " ")), 
+       width = 13, height = 5, dpi = 800 )
+##############
+
+ 
+extfig2D
+
+```
+# Plots total VE303 abundance and individual strain abundance over time: Figure 1B, 1C 
+# Plots diversity over time: Figure 5A
+```{r}
+ve303.dnameta <- ve303.dnameta_plot.alt
+
+source("plot.clean.abund.ve303_det_response.R")
+#source("plot.abund.ve303_det_response.R")
+
+
+
+```
+
+ 
+
+ 
+#Plot for VE303 Research MS
+#Combines panel to create Figure 1
+```{r}
+times <- "2wk"
+textsize = 16
+
+abuntime1 <- abuntime + theme(axis.title = element_blank(), legend.position = "none") + labs(title= NULL)
+dettime1 <- dettime + theme(legend.position = "none") +
+    theme(axis.text.x = element_blank(), axis.title.x =  element_blank(), axis.title = element_blank()) + 
+  labs(title= NULL)
+
+abuntime_strains1 <- abuntime_strains_long + theme(axis.title = element_blank(), legend.position = "none") + labs(title= NULL)
+
+patch1 <- wrap_plots(dettime1/abuntime1 ) + theme(plot.tag = element_text(size = 18))
+ # plot_annotation(tag_levels = 'A')
+ggsave(filename = here(results, paste(Sys.Date(),taxplot, "Research MS PK Figure 2AB.png", 
+                                      sep = " ")), width = 8, height = 10, dpi = 800)
+
+
+
+labels1 <- paste0("VE303-08 Colonization = 0")
+labels2 <- paste0("VE303-08 Colonization > 0")
+
+panel3_clin_median_ve303_08_eventfree1 <- panel3_clin_median_ve303_08_eventfree + labs(title= "Early Colonization: VE303-08")
+panel3_clin_median_ve303_08_eventfree2  <- panel3_clin_median_ve303_08_eventfree1 +
+  theme(axis.text.x = element_text(size = textsize, angle = 0, hjust = 1, vjust =1), 
+        axis.title.x = element_text(size = textsize ),
+        plot.title = element_text(size = textsize ),
+        axis.text.y = element_text(size = textsize, hjust = 1, vjust =0.5) ,     
+        axis.title.y = element_text(size = textsize, hjust = 0.5, vjust = 1) ) +
+      scale_colour_manual("",values=c("indianred2","cyan3"),breaks=c("Low Engraft", "High Engraft"), 
+                        labels=c(labels1,labels2))+
+      scale_fill_discrete(name="Engraftment",labels=c(labels1, labels2)) 
+ 
+
+panel_1D  <- panel1D + 
+  theme(axis.title = element_blank(), axis.title.x = element_text(size = 14),
+                             legend.title = element_blank(), legend.position = c(0.83, 0.9),
+                             legend.background=element_rect(fill = alpha("white", 0.0))) +
+       ylim(0,100) 
+
+
+patchd <- patch1 + abuntime_strains1 + panel_1D + panel3_clin_median_ve303_08_eventfree2 +
+  plot_layout(heights =  c(2, 1))
+
+
+patchd + plot_annotation(tag_levels = 'A') & theme(plot.tag = element_text(size = 18))
+
+ggsave(filename = here(results, paste(Sys.Date(),taxplot, times,"Research MS PK Figure 1.png", 
+                                      sep = " ")), width = 16, height = 16, dpi = 800)
+```
+
+ 
+
+
+## Various LME Models for Shannon Diversity: Model with Screening + Abx type as covariate
+
+```{r}
+
+
+timeplot <- "With Screening"
+abxplot <- "With Abx Cov"
+
+vvshann_lme <- vvtest5 %>% select(Sample.ID, Subject.Number, Visit.Name ,Day.in.treatment ,TRT.norm, rec.diagnosis.Wk8, shannon_diversity, species_richness, Abx.group) %>%
+  arrange(TRT.norm, rec.diagnosis.Wk8,Subject.Number, Day.in.treatment ) %>%
+  filter(Day.in.treatment < 30 & (!is.na(Visit.Name)) )
+
+vvshann_lme$Abx.group = factor(vvshann_lme$Abx.group, levels = c("Vancomycin", "Fidaxomicin"  , 
+                                                                       "Metronidazole", "Other"))
+
+vvshann_lme$TRT.norm = factor(vvshann_lme$TRT.norm, levels = c("Placebo", "VE303 Low Dose"  , "VE303 High Dose"))
+
+vvshann_lme$Visit.Name = factor(vvshann_lme$Visit.Name, levels = c("Screening","Day 1"  , "Day 7" , 
+                                                               "Day 14" ,  "Day 28", "Day 56" , 
+                                                               "Day 168"))
+
+vvshann_lme$Visit.Name = factor(vvshann_lme$Visit.Name, levels = c( "Screening", "Day 1"  , "Day 7" , 
+                                                               "Day 14" ,  "Day 28", "Day 56" , 
+                                                               "Day 168"))
+ 
+shannon_model_rec <- lmer(shannon_diversity ~ rec.diagnosis.Wk8 + Abx.group +  (1 |  Subject.Number), vvshann_lme, REML = F)
+
+
+shannon_model_full <- lmer(shannon_diversity ~ TRT.norm*rec.diagnosis.Wk8*Visit.Name + Abx.group + (1 |  Subject.Number), vvshann_lme, REML = F)
+ 
+shannon_model_random <- lmer(shannon_diversity ~ (1 | Subject.Number), vvshann_lme, REML = F)
+(AIC(shannon_model_random) - AIC(shannon_model_full) )*log2(exp(1))
+ 
+
+shannon_model_full_trt_visit <- lmer(shannon_diversity ~ TRT.norm*Visit.Name + Abx.group + (1 |  Subject.Number), vvshann_lme, REML = F)
+
+shannon_model_full_trt_rec <- lmer(shannon_diversity ~ TRT.norm*rec.diagnosis.Wk8 + Abx.group + (1 |  Subject.Number), vvshann_lme, REML = F)
+ 
+
+print("Model for Response and Treatment Interaction: Sets Bad Outcome as reference interaction level. Shows coefficient for good vs bad in each treatment")
+shannon_model_trt_rec1 <- lmer(shannon_diversity ~ TRT.norm + TRT.norm:rec.diagnosis.Wk8 + Abx.group + (1 |  Subject.Number), vvshann_lme, REML = F)
+
+print("Model for Response and Treatment Interaction: Sets Placebo as reference interaction level. Shows coefficient for treatment vs placebo given a response group")
+shannon_model_trt_rec2 <- lmer(shannon_diversity ~ rec.diagnosis.Wk8 + TRT.norm:rec.diagnosis.Wk8 + Abx.group + (1 |  Subject.Number), vvshann_lme, REML = F)
+
+
+print("Model for Visit and Treatment Interaction: Sets Screening as reference interaction level. Shows coefficient for diversity recovery in each treatment")
+shannon_model_trt_visit1 <- lmer(shannon_diversity ~ TRT.norm + TRT.norm:Visit.Name  + Abx.group + (1 |  Subject.Number), vvshann_lme, REML = F)
+
+print("Model for Visit and Treatment Interaction: Sets Placebo as reference interaction level. Shows coefficient for treated versus placebo at each timepoint")
+shannon_model_trt_visit2 <- lmer(shannon_diversity ~ Visit.Name + TRT.norm:Visit.Name  + Abx.group + (1 | Subject.Number), vvshann_lme, REML = F)
+
+####################################################################################
+
+save_result <- list(change_t_pertrt = summary(shannon_model_trt_visit1)$coefficients,
+                    change_trt_overtime = summary(shannon_model_trt_visit2)$coefficients)
+
+save_results <- lapply(save_result, function(x){
+  x <- as.data.frame(x)
+  x <- cbind(rownames(x) , x )
+  x <- rename(x, contrasts = `rownames(x)`)
+  x})
+
+
+## Writes LME coefficients and pvalues to multi sheet excel file ###
+writexl::write_xlsx(save_results, here(results, paste(Sys.Date(),  "LME Shannon_Table S5.xlsx", sep=" ")) )
+ 
+
+```
+
+ 
+## Various LME Models for Gini-Simpson: Model with Screening + Abx type as covariate
+
+```{r}
+ 
+
+timeplot <- "With Screening"
+abxplot <- "With Abx Cov"
+
+vvshann_lme <- vvtest5 %>% select(Sample.ID, Subject.Number, Visit.Name ,Day.in.treatment ,TRT.norm, rec.diagnosis.Wk8, shannon_diversity, gini_simpson_index,species_richness, Abx.group, Screening_abx_check) %>%
+  arrange(TRT.norm, rec.diagnosis.Wk8,Subject.Number, Day.in.treatment ) %>%
+  filter(Day.in.treatment < 70 & (!is.na(Visit.Name)) ) 
+#  filter(Screening_abx_check == "True Screening")
+
+vvshann_lme$Abx.group = factor(vvshann_lme$Abx.group, levels = c("Vancomycin", "Fidaxomicin"  , 
+                                                                       "Metronidazole", "Other"))
+
+vvshann_lme$TRT.norm = factor(vvshann_lme$TRT.norm, levels = c("Placebo", "VE303 Low Dose"  , "VE303 High Dose"))
+
+vvshann_lme$Visit.Name = factor(vvshann_lme$Visit.Name, levels = c("Screening","Day 1"  , "Day 7" , 
+                                                               "Day 14" ,  "Day 28", "Day 56" , 
+                                                               "Day 168"))
+
+vvshann_lme$Visit.Name = factor(vvshann_lme$Visit.Name, levels = c( "Screening", "Day 1"  , "Day 7" , 
+                                                               "Day 14" ,  "Day 28", "Day 56" , 
+                                                               "Day 168"))
+
+
+ 
+shannon_model_rec <- lmer(gini_simpson_index ~ rec.diagnosis.Wk8 + Abx.group +  (1 |  Subject.Number), vvshann_lme, REML = F)
+
+
+shannon_model_full <- lmer(gini_simpson_index ~ TRT.norm*rec.diagnosis.Wk8*Visit.Name + Abx.group + (1 |  Subject.Number), vvshann_lme, REML = F)
+#summary(shannon_model_full)
+#drop1(shannon_model_full,test="Chisq")
+
+shannon_model_random <- lmer(gini_simpson_index ~ (1 | Subject.Number), vvshann_lme, REML = F)
+(AIC(shannon_model_random) - AIC(shannon_model_full) )*log2(exp(1))
+ 
+
+shannon_model_full_trt_visit <- lmer(gini_simpson_index ~ TRT.norm*Visit.Name + Abx.group + (1 |  Subject.Number), vvshann_lme, REML = F)
+
+shannon_model_full_trt_rec <- lmer(gini_simpson_index ~ TRT.norm*rec.diagnosis.Wk8 + Abx.group + (1 |  Subject.Number), vvshann_lme, REML = F)
+ 
+
+print("Model for Response and Treatment Interaction: Sets Bad Outcome as reference interaction level. Shows coefficient for good vs bad in each treatment")
+shannon_model_trt_rec1 <- lmer(gini_simpson_index ~ TRT.norm + TRT.norm:rec.diagnosis.Wk8 + Abx.group + (1 |  Subject.Number), vvshann_lme, REML = F)
+
+print("Model for Response and Treatment Interaction: Sets Placebo as reference interaction level. Shows coefficient for treatment vs placebo given a response group")
+shannon_model_trt_rec2 <- lmer(gini_simpson_index ~ rec.diagnosis.Wk8 + TRT.norm:rec.diagnosis.Wk8 + Abx.group + (1 |  Subject.Number), vvshann_lme, REML = F)
+
+
+print("Model for Visit and Treatment Interaction: Sets Screening as reference interaction level. Shows coefficient for diversity recovery in each treatment")
+shannon_model_trt_visit1 <- lmer(gini_simpson_index ~ TRT.norm + TRT.norm:Visit.Name  + Abx.group + (1 |  Subject.Number), vvshann_lme, REML = F)
+
+print("Model for Visit and Treatment Interaction: Sets Placebo as reference interaction level. Shows coefficient for treated versus placebo at each timepoint")
+shannon_model_trt_visit2 <- lmer(gini_simpson_index ~ Visit.Name + TRT.norm:Visit.Name  + Abx.group + (1 | Subject.Number), vvshann_lme, REML = F)
+
+####################################################################################
+
+save_result <- list( 
+                    change_t_pertrt  = summary(shannon_model_trt_visit1)$coefficients,
+                    change_trt_overtime  = summary(shannon_model_trt_visit2)$coefficients )
+
+save_results <- lapply(save_result, function(x){
+  x <- as.data.frame(x)
+  x <- cbind(rownames(x) , x )
+  x <- rename(x, contrasts = `rownames(x)`)
+  x})
+
+save_results
+
+## Writes LME coefficients and pvalues to multi sheet excel file ###
+writexl::write_xlsx(save_results, here(results, paste(Sys.Date(),   "LME Simpson Table S5.xlsx", sep=" ")) )
+
+```
+
+ 
+
+ 
